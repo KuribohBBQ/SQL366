@@ -58,7 +58,6 @@ CREATE TABLE FloorPlans (
 CREATE TABLE Rooms (
   BuildingNumber  INT NOT NULL,
   RoomNumber      INT NOT NULL,
-  FloorNumber     INT NOT NULL,
 
   SquareFeet      INT NULL,
   Type            INT NULL,
@@ -221,4 +220,5 @@ CREATE TABLE Logs (
     REFERENCES Rooms(BuildingNumber, RoomNumber)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
+
 ) 
