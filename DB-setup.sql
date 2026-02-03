@@ -197,8 +197,7 @@ CREATE TABLE Users (
 
 CREATE TABLE Logs (
   LogId            INT NOT NULL AUTO_INCREMENT,
-  UserEmail        VARCHAR(320) NOT NULL,
-
+  
   LogDate          DATE NOT NULL,
   LoginTime        TIME NULL,
   LogOutTime       TIME NULL,
@@ -222,3 +221,4 @@ CREATE TABLE Logs (
     ON DELETE RESTRICT
 
 ) 
+
