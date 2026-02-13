@@ -1,6 +1,7 @@
 CREATE TABLE Colleges (
-  Name VARCHAR(200) NOT NULL,
-  PRIMARY KEY (Name)
+  AbbreviatedName VARCHAR(200) NOT NULL,
+  FullName VARCHAR(200) NOT NULL,
+  PRIMARY KEY (AbbreviatedNameName)
 ) 
 
 CREATE TABLE Departments (
@@ -54,20 +55,20 @@ CREATE TABLE FloorPlans (
 -- Rooms
 -- Rooms are in Buildings (M:1) and on Floors (M:1)
 -- Rooms assigned to Departments (M:1)
+CREATE TABLE RoomType (
+  RoomUseCode INT NOT NULL PRIMARY KEY,
+  Name VARCHAR(200) NOT NULL,
+)
 
 CREATE TABLE Rooms (
   BuildingNumber  INT NOT NULL,
   RoomNumber      INT NOT NULL,
-
+  FloorNumber     INT NOT NULL,
   SquareFeet      INT NULL,
-  Type            INT NULL,
+  RoomType            INT NULL,
   Notes           VARCHAR(2000) NULL,
-  ImageUrl        VARCHAR(1000) NULL,
   Occupancy       INT NULL,
-  FurnitureType   INT NULL,
   Coordinates     VARCHAR(500) NULL,
-
-  DepartmentName  VARCHAR(200) NULL,
 
   PRIMARY KEY (BuildingNumber, RoomNumber),
 
@@ -87,6 +88,11 @@ CREATE TABLE Rooms (
     ON UPDATE CASCADE
     ON DELETE SET NULL,
 
+  CONSTRAINT fk_room_type
+    FOREIGN KEY (RoomType) REFERENCES RoomType(RoomUseCode)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+
   CONSTRAINT chk_rooms_squarefeet
     CHECK (SquareFeet IS NULL OR SquareFeet >= 0),
 
@@ -94,16 +100,22 @@ CREATE TABLE Rooms (
     CHECK (Occupancy IS NULL OR Occupancy >= 0)
 ) 
 
+CREATE TABLE RoomImage (
+  BuildingNumber INT NOT NULL,
+  FloorNumber INT NOT NULL,
+  RoomNumber INT NOT NULL,
+  
+  ImageURL VARCHAR(500) NOT NULL UNIQUE
 
--- Faculty + junction (M:N)
+  PRIMARY KEY(BuildingNumber, RoomNumber, FloorNumber, ImageURL),
 
-CREATE TABLE Faculty (
-  Email      VARCHAR(320) NOT NULL,
-  Name       VARCHAR(200) NOT NULL,
-  College    VARCHAR(200) NULL,
-  Department VARCHAR(200) NULL,
-  PRIMARY KEY (Email)
-) 
+  CONSTRAINT fk_rooms_floor_building
+    FOREIGN KEY (BuildingNumber, FloorNumber, RoomNumber) REFERENCES Rooms(BuildingNumber, FloorNumber, RoomNumber)
+    ON UPDATE CASCADE,
+    ON DELETE CASCADE
+)
+
+
 
 CREATE TABLE FacultyAssignedToRooms (
   Email          VARCHAR(320) NOT NULL,
