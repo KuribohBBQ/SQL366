@@ -1,5 +1,4 @@
--- Employees inserts generated from BCSM Faculty and departments.xlsx
--- Email rule: first initial + last name minus last letter + @calpoly.edu
+
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
 VALUES ('rabrilvalenzuel@calpoly.edu', 'Roberto Abril Valenzuela', 'Physics', 'CP')
