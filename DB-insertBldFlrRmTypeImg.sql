@@ -1,113 +1,120 @@
 
--- Buildings
 INSERT INTO Buildings (BuildingNumber, Name, NumOfFloors)
-VALUES (33, 'Clyde P. Fisher Science Hall', 4)
-ON DUPLICATE KEY UPDATE Name = VALUES(Name), NumOfFloors = VALUES(NumOfFloors);
+VALUES (33, 'Clyde P. Fisher Science Hall', 3)
+ON DUPLICATE KEY UPDATE Name=VALUES(Name), NumOfFloors=VALUES(NumOfFloors);
 
--- Floors
 INSERT INTO Floors (BuildingNumber, FloorNumber)
 VALUES (33, 3)
-ON DUPLICATE KEY UPDATE FloorNumber = VALUES(FloorNumber);
+ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber);
 
--- RoomType
 INSERT INTO RoomType (RoomUseCode, Name)
 VALUES (210, 'Teaching Lab')
-ON DUPLICATE KEY UPDATE Name = VALUES(Name);
+ON DUPLICATE KEY UPDATE Name=VALUES(Name);
 
 INSERT INTO RoomType (RoomUseCode, Name)
 VALUES (211, 'Special Instruction')
-ON DUPLICATE KEY UPDATE Name = VALUES(Name);
+ON DUPLICATE KEY UPDATE Name=VALUES(Name);
 
 INSERT INTO RoomType (RoomUseCode, Name)
 VALUES (215, 'Teaching Lab Service')
-ON DUPLICATE KEY UPDATE Name = VALUES(Name);
+ON DUPLICATE KEY UPDATE Name=VALUES(Name);
 
 INSERT INTO RoomType (RoomUseCode, Name)
 VALUES (250, 'Research Lab')
-ON DUPLICATE KEY UPDATE Name = VALUES(Name);
+ON DUPLICATE KEY UPDATE Name=VALUES(Name);
 
 INSERT INTO RoomType (RoomUseCode, Name)
 VALUES (311, 'Staff Office')
-ON DUPLICATE KEY UPDATE Name = VALUES(Name);
+ON DUPLICATE KEY UPDATE Name=VALUES(Name);
 
--- Rooms
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 451, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 451, 3, 'Biological Sciences', 210, 894, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 452, 3, 'Biological Sciences', 215, NULL, NULL, 0)
+VALUES (33, 452, 3, 'Biological Sciences', 215, 252, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 453, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 453, 3, 'Biological Sciences', 210, 888, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 454, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 454, 3, 'Biological Sciences', 210, 906, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 455, 3, 'Biological Sciences', 215, NULL, NULL, 0)
+VALUES (33, 455, 3, 'Biological Sciences', 215, 252, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 456, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 456, 3, 'Biological Sciences', 210, 896, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 458, 3, 'Biological Sciences', 311, NULL, 'Wacker, Mark (CSM-BIO);Jacobson, Craig (CSM-BIO)', 2)
+VALUES (33, 458, 3, 'Biological Sciences', 311, 250, 'Wacker, Mark (CSM-BIO);Jacobson, Craig (CSM-BIO)', 2)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 459, 3, 'Biological Sciences', 250, NULL, 'Chan, Lauren (CSM-BIO);Francis, Clinton (CSM-BIO)', 10)
+VALUES (33, 459, 3, 'Biological Sciences', 250, 891, 'Chan, Lauren (CSM-BIO);Francis, Clinton (CSM-BIO)', 10)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 460, 3, 'Biological Sciences', 250, NULL, 'Fidopiastis, Pat (CSM-BIO)', 2)
+VALUES (33, 460, 3, 'Biological Sciences', 250, 362, 'Fidopiastis, Pat (CSM-BIO)', 2)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 461, 3, 'Biological Sciences', 250, NULL, 'Chan, Lauren (CSM-BIO);Liwanag, Heather (CSM-BIO)', 2)
+VALUES (33, 461, 3, 'Biological Sciences', 250, 323, 'Chan, Lauren (CSM-BIO);Liwanag, Heather (CSM-BIO)', 2)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 465, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 465, 3, 'Biological Sciences', 210, 910, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 466, 3, 'Biological Sciences', 215, NULL, NULL, 0)
+VALUES (33, 466, 3, 'Biological Sciences', 215, 181, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 467, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 466, 3, 'Biological Sciences', 215, 115, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 468, 3, 'Biological Sciences', 210, NULL, NULL, 24)
+VALUES (33, 466, 3, 'Biological Sciences', 215, 762, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 469, 3, 'Biological Sciences', 211, NULL, NULL, 0)
+VALUES (33, 467, 3, 'Biological Sciences', 210, 921, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 470, 3, 'Biological Sciences', 250, NULL, 'Yeung, Marie (CSM-BIO)', 2)
+VALUES (33, 468, 3, 'Biological Sciences', 211, 304, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 471, 3, 'Biological Sciences', 250, NULL, 'Yeung, Marie (CSM-BIO)', 2)
+VALUES (33, 468, 3, 'Biological Sciences', 210, 942, NULL, 24)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 472, 3, 'Biological Sciences', 250, NULL, 'Strand, Christy (CSM-BIO)', 6)
+VALUES (33, 469, 3, 'Biological Sciences', 211, 174, NULL, 0)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
 INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
-VALUES (33, 473, 3, 'Biological Sciences', 250, NULL, 'Liwanag, Heather (CSM-BIO)', 6)
+VALUES (33, 470, 3, 'Biological Sciences', 250, 202, 'Yeung, Marie (CSM-BIO)', 2)
 ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
 
--- RoomImage
+INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
+VALUES (33, 471, 3, 'Biological Sciences', 250, 172, 'Yeung, Marie (CSM-BIO)', 2)
+ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
+
+INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
+VALUES (33, 472, 3, 'Biological Sciences', 250, 427, 'Strand, Christy (CSM-BIO)', 6)
+ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
+
+INSERT INTO Rooms (BuildingNumber, RoomNumber, FloorNumber, DepartmentName, RoomUseCode, SquareFeet, Notes, Occupancy)
+VALUES (33, 473, 3, 'Biological Sciences', 250, 427, 'Liwanag, Heather (CSM-BIO)', 6)
+ON DUPLICATE KEY UPDATE FloorNumber=VALUES(FloorNumber), DepartmentName=VALUES(DepartmentName), RoomUseCode=VALUES(RoomUseCode), SquareFeet=VALUES(SquareFeet), Notes=VALUES(Notes), Occupancy=VALUES(Occupancy);
+
 INSERT IGNORE INTO RoomImage (BuildingNumber, RoomNumber, ImageURL)
 VALUES (33, 451, 'https://www.appsheet.com/image/getimageurl?appName=CalPolySpaceManagement2025-1009913&tableName=Facilities&fileName=Facilities_Images%2F033-0%2F033-0%200451-00.Room%20Photo1.180454.jpg&appVersion=1.000082&signature=59f51ab65ff29e020869c378759e328306902e7e78007c2650f5c15358433dba');
 
