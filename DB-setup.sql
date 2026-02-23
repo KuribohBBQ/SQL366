@@ -4,7 +4,7 @@ CREATE TABLE Colleges (
   PRIMARY KEY (AbbreviatedName)
 );
 
-CREATE TABLE Departments (
+CREATE TABLE Departments_Subdivisions (
   DepartmentName    VARCHAR(200) NOT NULL,
   College VARCHAR(200) NOT NULL,
   PRIMARY KEY (DepartmentName, College),
@@ -69,7 +69,7 @@ CREATE TABLE Rooms (
   RoomNumber      VARCHAR(50) NOT NULL,
   FloorNumber     INT NOT NULL,      
   RoomUseCode     INT NOT NULL,
-  SquareFeet      FLOAT,
+  SquareFeet      DECIMAL(10,2) NULL,
   Notes           VARCHAR(2000) NULL,
   Occupancy       INT NULL,
 
@@ -90,14 +90,14 @@ CREATE TABLE Rooms (
   CONSTRAINT fk_rooms_type
     FOREIGN KEY (RoomUseCode) REFERENCES RoomType(RoomUseCode)
     ON UPDATE CASCADE
-    ON DELETE SET NULL
+    ON DELETE RESTRICT
 );
 
 
 CREATE TABLE RoomImage (
   FileName VARCHAR(500) NOT NULL,
   BuildingNumber INT NOT NULL,
-  RoomNumber INT NOT NULL,
+  RoomNumber VARCHAR(50) NOT NULL,
 
   PRIMARY KEY(FileName),
 
@@ -109,15 +109,15 @@ CREATE TABLE RoomImage (
 );
 
 CREATE TABLE RoomCoordinates (
-  BuildingNum INT NOT NULL,
+  BuildingNumber INT NOT NULL,
   RoomNumber VARCHAR(50) NOT NULL,
   TopLeftX INT NOT NULL,
   TopLeftY INT NOT NULL,
   BottomRightX INT NOT NULL,
   BottomRightY INT NOT NULL,
-  PRIMARY KEY (BuildingNum, RoomNumber),
+  PRIMARY KEY (BuildingNumber, RoomNumber),
   CONSTRAINT fk_roomcoordinates_room
-    FOREIGN KEY (BuildingNum, RoomNumber) 
+    FOREIGN KEY (BuildingNumber, RoomNumber) 
     REFERENCES Rooms(BuildingNumber, RoomNumber)
     ON UPDATE CASCADE
     ON DELETE CASCADE
@@ -128,36 +128,21 @@ CREATE TABLE RoomCoordinates (
 CREATE TABLE Equipment (
   EType        VARCHAR(100) NOT NULL,
   EDescription VARCHAR(1000) NULL,
-  Sensitive   VARCHAR(50) NOT NULL DEFAULT 'No',
+  Sensitive   BOOLEAN NOT NULL DEFAULT FALSE,
   PRIMARY KEY (EType)
 );
 
-CREATE TABLE RoomsHaveEquipment (
-  BuildingNumber INT NOT NULL,
-  RoomNumber     INT NOT NULL,
-  EType           VARCHAR(100) NOT NULL,
-  PRIMARY KEY (BuildingNumber, RoomNumber, EType),
-  CONSTRAINT fk_rhe_room
-    FOREIGN KEY (BuildingNumber, RoomNumber)
-    REFERENCES Rooms(BuildingNumber, RoomNumber)
-    ON UPDATE CASCADE
-    ON DELETE CASCADE,
-  CONSTRAINT fk_rhe_equipment
-    FOREIGN KEY (EType) REFERENCES Equipment(EType)
-    ON UPDATE CASCADE
-    ON DELETE RESTRICT
-);
 
 CREATE TABLE Employees (
   EmpID        INT NOT NULL AUTO_INCREMENT,
-  Email          VARCHAR(320) NOT NULL,
+  Email          VARCHAR(320) NOT NULL UNIQUE,
   FullName       VARCHAR(200) NOT NULL,
   DepartmentName VARCHAR(200) NOT NULL,
   College        VARCHAR(200) NOT NULL,
   PRIMARY KEY (EmpID),
 
   CONSTRAINT fk_emp_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
@@ -195,15 +180,15 @@ CREATE TABLE Users (
 -- Relationship Set Tables (M:M or 1:M without participation constraints)
 CREATE TABLE EmployeesAssignedToRooms (
   EmpID INT NOT NULL,
-  RoomNum VARCHAR(50) NOT NULL,
-  BuildingNum INT NOT NULL,
-  PRIMARY KEY (EmpID, RoomNum, BuildingNum),
+  RoomNumber VARCHAR(50) NOT NULL,
+  BuildingNumber INT NOT NULL,
+  PRIMARY KEY (EmpID, RoomNumber, BuildingNumber),
   CONSTRAINT fk_eatr_emp
     FOREIGN KEY (EmpID) REFERENCES Employees(EmpID)
     ON UPDATE CASCADE
     ON DELETE CASCADE,
   CONSTRAINT fk_eatr_room
-    FOREIGN KEY (BuildingNum, RoomNum) REFERENCES Rooms(BuildingNumber, RoomNumber)
+    FOREIGN KEY (BuildingNumber, RoomNumber) REFERENCES Rooms(BuildingNumber, RoomNumber)
     ON UPDATE CASCADE
     ON DELETE CASCADE
 );
@@ -237,7 +222,7 @@ CREATE TABLE RoomsAreAssignedToDepts_Subdiv (
     ON UPDATE CASCADE
     ON DELETE CASCADE,
   CONSTRAINT fk_raadt_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );

@@ -1,21 +1,33 @@
-DROP TABLE IF EXISTS LogEqpmtToRoom;
-DROP TABLE IF EXISTS LogDeptToRoom;
-DROP TABLE IF EXISTS LogEmplToRoom;
-DROP TABLE IF EXISTS LogOut;
-DROP TABLE IF EXISTS LogIn;
-DROP TABLE IF EXISTS Logs;
-DROP TABLE IF EXISTS Users;
-DROP TABLE IF EXISTS RolePermissions;
-DROP TABLE IF EXISTS Permissions;
-DROP TABLE IF EXISTS Roles;
-DROP TABLE IF EXISTS Employees;
-DROP TABLE IF EXISTS RoomsHaveEquipment;
-DROP TABLE IF EXISTS Equipment;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Relationship (junction) tables
+DROP TABLE IF EXISTS RoomsAreAssignedToDepts_Subdiv;
+DROP TABLE IF EXISTS RoomsAreEquippedWithEquipment;
+DROP TABLE IF EXISTS EmployeesAssignedToRooms;
+
+-- Dependent child tables
+DROP TABLE IF EXISTS RoomCoordinates;
 DROP TABLE IF EXISTS RoomImage;
+
+-- Core room/floor/building tables
 DROP TABLE IF EXISTS Rooms;
 DROP TABLE IF EXISTS RoomType;
+
 DROP TABLE IF EXISTS FloorPlans;
 DROP TABLE IF EXISTS Floors;
+
 DROP TABLE IF EXISTS Buildings;
-DROP TABLE IF EXISTS Departments;
+
+-- Users / roles
+DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS Roles;
+
+-- Employees / equipment
+DROP TABLE IF EXISTS Employees;
+DROP TABLE IF EXISTS Equipment;
+
+-- Departments / colleges
+DROP TABLE IF EXISTS Departments_Subdivisions;
 DROP TABLE IF EXISTS Colleges;
+
+SET FOREIGN_KEY_CHECKS = 1;
