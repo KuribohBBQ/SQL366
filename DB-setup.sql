@@ -40,10 +40,8 @@ CREATE TABLE Floors (
 
 
 -- FloorPlans (1:1 with Floors)
-
 CREATE TABLE FloorPlans (
   FileName       VARCHAR(500) NOT NULL,
-  FilePath       VARCHAR(1000) NOT NULL,
   BuildingNumber INT NOT NULL,
   FloorNumber    INT NOT NULL,
   PRIMARY KEY (FileName),
