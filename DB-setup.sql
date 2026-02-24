@@ -140,7 +140,7 @@ CREATE TABLE Employees (
   PRIMARY KEY (EmpID),
 
   CONSTRAINT fk_emp_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
@@ -200,7 +200,7 @@ CREATE TABLE Logs(
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   CONSTRAINT fk_logs_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   CONSTRAINT fk_logs_equipment
@@ -257,7 +257,7 @@ CREATE TABLE RoomsAreAssignedToDepts_Subdiv (
     ON UPDATE CASCADE
     ON DELETE CASCADE,
   CONSTRAINT fk_raadt_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );

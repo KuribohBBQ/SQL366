@@ -945,7 +945,7 @@ VALUES ('rla@calpoly.edu', 'Ryan Lau', 'Unknown Department', 'UNKN')
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
-VALUES ('alaubsche@calpoly.edu', 'Andrea CHEM Laubscher', 'Chemistry', 'BCSM')
+VALUES ('alaubsche@calpoly.edu', 'Andrea CHEM Laubscher', 'Chemistry & Biochemistry', 'BCSM')
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
@@ -1077,7 +1077,7 @@ VALUES ('bmcmille@calpoly.edu', 'Brooke McMillen', 'School of Education', 'BCSM'
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
-VALUES ('cmcnab@calpoly.edu', 'Candace McNabb', 'Chemistry', 'BCSM')
+VALUES ('cmcnab@calpoly.edu', 'Candace McNabb', 'Chemistry & Biochemistry', 'BCSM')
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
@@ -1461,7 +1461,7 @@ VALUES ('ksantilen@calpoly.edu', 'Katharine Santilena', 'Unknown Department', 'U
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
-VALUES ('ksantilen2@calpoly.edu', 'Katharine Santilena', ''Kinesiology & Public Hlth', 'BCSM')
+VALUES ('ksantilen2@calpoly.edu', 'Katharine Santilena', 'Kinesiology & Public Hlth', 'BCSM')
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
@@ -1493,7 +1493,7 @@ VALUES ('jschedle@calpoly.edu', 'Julia Schedler', 'Statistics', 'BCSM')
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
-VALUES ('aschinckmike@calpoly.edu', 'Amelie Schinck-Mikel', 'Mathematicst', 'BCSM')
+VALUES ('aschinckmike@calpoly.edu', 'Amelie Schinck-Mikel', 'Mathematics', 'BCSM')
 ON DUPLICATE KEY UPDATE FullName=VALUES(FullName), DepartmentName=VALUES(DepartmentName), College=VALUES(College);
 
 INSERT INTO Employees (Email, FullName, DepartmentName, College)
