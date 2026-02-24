@@ -4,11 +4,11 @@ CREATE TABLE Colleges (
   PRIMARY KEY (AbbreviatedName)
 );
 
-CREATE TABLE Departments_Subdivisions (
+CREATE TABLE Departments_Subdivisions_Subdivisions (
   DepartmentName    VARCHAR(200) NOT NULL,
   College VARCHAR(200) NOT NULL,
   PRIMARY KEY (DepartmentName, College),
-  CONSTRAINT fk_departments_college
+  CONSTRAINT fk_Departments_Subdivisions_college
     FOREIGN KEY (College) REFERENCES Colleges(AbbreviatedName)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
@@ -95,11 +95,11 @@ CREATE TABLE Rooms (
 
 
 CREATE TABLE RoomImage (
-  FileName VARCHAR(500) NOT NULL,
+  ImageURL VARCHAR(500) NOT NULL,
   BuildingNumber INT NOT NULL,
   RoomNumber VARCHAR(50) NOT NULL,
 
-  PRIMARY KEY(FileName),
+  PRIMARY KEY(ImageURL),
 
   CONSTRAINT fk_roomimage_room
     FOREIGN KEY (BuildingNumber, RoomNumber) 
@@ -128,7 +128,7 @@ CREATE TABLE RoomCoordinates (
 CREATE TABLE Equipment (
   EType        VARCHAR(100) NOT NULL,
   EDescription VARCHAR(1000) NULL,
-  Sensitive   BOOLEAN NOT NULL DEFAULT FALSE,
+  IsSensitive    TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (EType)
 );
 
@@ -142,7 +142,7 @@ CREATE TABLE Employees (
   PRIMARY KEY (EmpID),
 
   CONSTRAINT fk_emp_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
@@ -174,7 +174,44 @@ CREATE TABLE Users (
 
 
 -- Logs (User 1:M Logs, Logs M:1 Rooms)
+CREATE TABLE Logs(
+  ID INT NOT NULL AUTO_INCREMENT,
+  Date DATE NOT NULL DEFAULT (CURRENT_DATE),
+  LogIn TIME NOT NULL DEFAULT (CURRENT_TIME),
+  LogOut TIME,
+  UserID INT NOT NULL,
+  AssignOrDelete VARCHAR(10), -- 'Assign' or 'Delete'
+  BuildingNumber INT,
+  RoomNumber VARCHAR(50),
+  EmpID INT,
+  DepartmentName VARCHAR(200),
+  College VARCHAR(200),
+  EType VARCHAR(100),
+  Quantity INT,
+  PRIMARY KEY (ID),
+  CONSTRAINT fk_logs_user
+    FOREIGN KEY (UserID) REFERENCES Users(UserID)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_logs_room
+    FOREIGN KEY (BuildingNumber, RoomNumber) REFERENCES Rooms(BuildingNumber, RoomNumber)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  CONSTRAINT fk_logs_emp
+    FOREIGN KEY (EmpID) REFERENCES Employees(EmpID)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  CONSTRAINT fk_logs_dept
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions_Subdivisions(DepartmentName, College)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  CONSTRAINT fk_logs_equipment
+    FOREIGN KEY (EType) REFERENCES Equipment(EType)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
 
+
+);
 
 
 -- Relationship Set Tables (M:M or 1:M without participation constraints)
@@ -222,7 +259,7 @@ CREATE TABLE RoomsAreAssignedToDepts_Subdiv (
     ON UPDATE CASCADE
     ON DELETE CASCADE,
   CONSTRAINT fk_raadt_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions_Subdivisions(DepartmentName, College)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
