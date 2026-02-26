@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS RoomImage;
 -- Core room/floor/building tables
 DROP TABLE IF EXISTS Rooms;
 DROP TABLE IF EXISTS RoomType;
+DROP TABLE IF EXISTS SpaceType;
 
 DROP TABLE IF EXISTS FloorPlans;
 DROP TABLE IF EXISTS Floors;

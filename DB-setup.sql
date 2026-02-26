@@ -4,10 +4,11 @@ CREATE TABLE Colleges (
   PRIMARY KEY (AbbreviatedName)
 );
 
-CREATE TABLE Departments_Subdivisions_Subdivisions (
+CREATE TABLE Departments_Subdivisions (
+  DeptID INT NOT NULL,
   DepartmentName    VARCHAR(200) NOT NULL,
   College VARCHAR(200) NOT NULL,
-  PRIMARY KEY (DepartmentName, College),
+  PRIMARY KEY (DeptID),
   CONSTRAINT fk_Departments_Subdivisions_college
     FOREIGN KEY (College) REFERENCES Colleges(AbbreviatedName)
     ON UPDATE CASCADE
@@ -18,7 +19,7 @@ CREATE TABLE Departments_Subdivisions_Subdivisions (
 -- Buildings
 
 CREATE TABLE Buildings (
-  BuildingNumber INT NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
   Name           VARCHAR(200) NOT NULL,
   NumOfFloors     INT NOT NULL,
   PRIMARY KEY (BuildingNumber),
@@ -29,7 +30,7 @@ CREATE TABLE Buildings (
 -- Floors (weak under Building)
 
 CREATE TABLE Floors (
-  BuildingNumber INT NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
   FloorNumber    INT NOT NULL,
   PRIMARY KEY (BuildingNumber, FloorNumber),
   CONSTRAINT fk_floors_building
@@ -42,7 +43,7 @@ CREATE TABLE Floors (
 -- FloorPlans (1:1 with Floors)
 CREATE TABLE FloorPlans (
   FileName       VARCHAR(500) NOT NULL,
-  BuildingNumber INT NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
   FloorNumber    INT NOT NULL,
   PRIMARY KEY (FileName),
   CONSTRAINT fk_floorplans_floor
@@ -56,20 +57,27 @@ CREATE TABLE FloorPlans (
 
 -- RoomType
 CREATE TABLE RoomType (
-  RoomUseCode INT NOT NULL,
+  RoomUseCode VARCHAR(3) NOT NULL,
   Name VARCHAR(200) NOT NULL,
   PRIMARY KEY (RoomUseCode)
 );
 
+-- SpaceType
+CREATE TABLE SpaceType (
+  SpaceCode VARCHAR(2) NOT NULL,
+  Name VARCHAR(200) NOT NULL,
+  PRIMARY KEY (SpaceCode)
+);
+
 -- Rooms (weak under Buildings)
 CREATE TABLE Rooms (
-  BuildingNumber  INT NOT NULL,
-  RoomNumber      VARCHAR(50) NOT NULL,
+  BuildingNumber  VARCHAR(5) NOT NULL,
+  RoomNumber      VARCHAR(7) NOT NULL,
   FloorNumber     INT NOT NULL,      
-  RoomUseCode     INT NOT NULL,
+  RoomUseCode     VARCHAR(3) NOT NULL,
+  SpaceCode        VARCHAR(2) NOT NULL,
   SquareFeet      DECIMAL(10,2) NULL,
-  Notes           VARCHAR(2000) NULL,
-  Occupancy       INT NULL,
+  Notes           VARCHAR(2000) NOT NULL DEFAULT '',
 
   PRIMARY KEY (BuildingNumber, RoomNumber),
 
@@ -88,14 +96,19 @@ CREATE TABLE Rooms (
   CONSTRAINT fk_rooms_type
     FOREIGN KEY (RoomUseCode) REFERENCES RoomType(RoomUseCode)
     ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  
+  CONSTRAINT fk_rooms_spacetype
+    FOREIGN KEY (SpaceCode) REFERENCES SpaceType(SpaceCode)
+    ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
 
 
 CREATE TABLE RoomImage (
   ImageURL VARCHAR(500) NOT NULL,
-  BuildingNumber INT NOT NULL,
-  RoomNumber VARCHAR(50) NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
+  RoomNumber VARCHAR(7) NOT NULL,
 
   PRIMARY KEY(ImageURL),
 
@@ -107,8 +120,8 @@ CREATE TABLE RoomImage (
 );
 
 CREATE TABLE RoomCoordinates (
-  BuildingNumber INT NOT NULL,
-  RoomNumber VARCHAR(50) NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
+  RoomNumber VARCHAR(7) NOT NULL,
   TopLeftX INT NOT NULL,
   TopLeftY INT NOT NULL,
   BottomRightX INT NOT NULL,
@@ -135,12 +148,11 @@ CREATE TABLE Employees (
   EmpID        INT NOT NULL AUTO_INCREMENT,
   Email          VARCHAR(320) NOT NULL UNIQUE,
   FullName       VARCHAR(200) NOT NULL,
-  DepartmentName VARCHAR(200) NOT NULL,
-  College        VARCHAR(200) NOT NULL,
+  DeptID        INT NOT NULL,
   PRIMARY KEY (EmpID),
 
   CONSTRAINT fk_emp_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DeptID) REFERENCES Departments_Subdivisions(DeptID)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
@@ -148,7 +160,7 @@ CREATE TABLE Employees (
 -- Roles, Permissions, RolePermissions (Roles given Permissions)
 
 CREATE TABLE Roles (
-  Role_ID   VARCHAR(50) NOT NULL,
+  Role_ID   INT NOT NULL,
   RoleName  VARCHAR(200) NOT NULL,
   PRIMARY KEY (Role_ID)
 );
@@ -159,10 +171,10 @@ CREATE TABLE Roles (
 
 CREATE TABLE Users (
   UserID   INT NOT NULL AUTO_INCREMENT,
-  Email     VARCHAR(320) NOT NULL,
+  Email     VARCHAR(320) NOT NULL UNIQUE,
   Name      VARCHAR(200) NOT NULL,
   Password  VARCHAR(255) NOT NULL,  -- store hash
-  Role_ID   VARCHAR(50) NOT NULL,
+  Role_ID   INT NOT NULL,
   PRIMARY KEY (UserID),
   CONSTRAINT fk_users_role
     FOREIGN KEY (Role_ID) REFERENCES Roles(Role_ID)
@@ -179,11 +191,10 @@ CREATE TABLE Logs(
   LogOut TIME,
   UserID INT NOT NULL,
   AssignOrDelete VARCHAR(10), -- 'Assign' or 'Delete'
-  BuildingNumber INT,
-  RoomNumber VARCHAR(50),
+  BuildingNumber VARCHAR(5),
+  RoomNumber VARCHAR(7),
   EmpID INT,
-  DepartmentName VARCHAR(200),
-  College VARCHAR(200),
+  DeptID INT,
   EType VARCHAR(100),
   Quantity INT,
   PRIMARY KEY (ID),
@@ -200,7 +211,7 @@ CREATE TABLE Logs(
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   CONSTRAINT fk_logs_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DeptID) REFERENCES Departments_Subdivisions(DeptID)
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   CONSTRAINT fk_logs_equipment
@@ -215,8 +226,8 @@ CREATE TABLE Logs(
 -- Relationship Set Tables (M:M or 1:M without participation constraints)
 CREATE TABLE EmployeesAssignedToRooms (
   EmpID INT NOT NULL,
-  RoomNumber VARCHAR(50) NOT NULL,
-  BuildingNumber INT NOT NULL,
+  RoomNumber VARCHAR(7) NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
   PRIMARY KEY (EmpID, RoomNumber, BuildingNumber),
   CONSTRAINT fk_eatr_emp
     FOREIGN KEY (EmpID) REFERENCES Employees(EmpID)
@@ -229,8 +240,8 @@ CREATE TABLE EmployeesAssignedToRooms (
 );
 
 CREATE TABLE RoomsAreEquippedWithEquipment (
-  BuildingNumber INT NOT NULL,
-  RoomNumber     VARCHAR(50) NOT NULL,
+  BuildingNumber VARCHAR(5) NOT NULL,
+  RoomNumber     VARCHAR(7) NOT NULL,
   EType           VARCHAR(100) NOT NULL,
   Quantity        INT NOT NULL DEFAULT 1,
   PRIMARY KEY (BuildingNumber, RoomNumber, EType),
@@ -246,18 +257,17 @@ CREATE TABLE RoomsAreEquippedWithEquipment (
 );
 
 CREATE TABLE RoomsAreAssignedToDepts_Subdiv (
-  BuildingNumber INT NOT NULL,
-  RoomNumber     VARCHAR(50) NOT NULL,
-  DepartmentName VARCHAR(200) NOT NULL,
-  College        VARCHAR(200) NOT NULL,
-  PRIMARY KEY (BuildingNumber, RoomNumber, DepartmentName, College),
+  BuildingNumber VARCHAR(5) NOT NULL,
+  RoomNumber     VARCHAR(7) NOT NULL,
+  DeptID INT NOT NULL,
+  PRIMARY KEY (BuildingNumber, RoomNumber, DeptID),
   CONSTRAINT fk_raadt_room
     FOREIGN KEY (BuildingNumber, RoomNumber)
     REFERENCES Rooms(BuildingNumber, RoomNumber)
     ON UPDATE CASCADE
     ON DELETE CASCADE,
   CONSTRAINT fk_raadt_dept
-    FOREIGN KEY (DepartmentName, College) REFERENCES Departments_Subdivisions(DepartmentName, College)
+    FOREIGN KEY (DeptID) REFERENCES Departments_Subdivisions(DeptID)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
