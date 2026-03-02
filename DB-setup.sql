@@ -69,6 +69,12 @@ CREATE TABLE SpaceType (
   PRIMARY KEY (SpaceCode)
 );
 
+CREATE TABLE FurnitureType (
+  FurnitureCode VARCHAR(2) NOT NULL,
+  Name VARCHAR(200) NOT NULL,
+  PRIMARY KEY (FurnitureCode)
+);
+
 -- Rooms (weak under Buildings)
 CREATE TABLE Rooms (
   BuildingNumber  VARCHAR(5) NOT NULL,
@@ -76,6 +82,7 @@ CREATE TABLE Rooms (
   FloorNumber     INT NOT NULL,      
   RoomUseCode     VARCHAR(3) NOT NULL,
   SpaceCode        VARCHAR(2) NOT NULL,
+  FurnitureCode     VARCHAR(2) NOT NULL,
   SquareFeet      DECIMAL(10,2) NULL,
   Notes           VARCHAR(2000) NOT NULL DEFAULT '',
 
@@ -137,10 +144,11 @@ CREATE TABLE RoomCoordinates (
 -- Equipment (M:N)
 
 CREATE TABLE Equipment (
+  EId INT NOT NULL AUTO_INCREMENT,
   EType        VARCHAR(100) NOT NULL,
   EDescription VARCHAR(1000) NULL,
   IsSensitive    TINYINT(1) NOT NULL DEFAULT 0,
-  PRIMARY KEY (EType)
+  PRIMARY KEY (EId)
 );
 
 
@@ -195,7 +203,7 @@ CREATE TABLE Logs(
   RoomNumber VARCHAR(7),
   EmpID INT,
   DeptID INT,
-  EType VARCHAR(100),
+  EId INT,
   Quantity INT,
   PRIMARY KEY (ID),
   CONSTRAINT fk_logs_user
@@ -215,11 +223,24 @@ CREATE TABLE Logs(
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   CONSTRAINT fk_logs_equipment
-    FOREIGN KEY (EType) REFERENCES Equipment(EType)
+    FOREIGN KEY (EId) REFERENCES Equipment(EId)
     ON UPDATE CASCADE
     ON DELETE SET NULL
 
 
+);
+
+CREATE TABLE Actions (
+  ActionID INT NOT NULL,
+  ActionDescription VARCHAR(1000) NOT NULL,
+  PRIMARY KEY (ActionID)
+);
+
+CREATE TABLE People (
+  PersonID INT NOT NULL AUTO_INCREMENT,
+  FullName VARCHAR(200) NOT NULL UNIQUE,
+  PhoneNumber VARCHAR(20) NULL,
+  PRIMARY KEY (PersonID)
 );
 
 
@@ -242,18 +263,29 @@ CREATE TABLE EmployeesAssignedToRooms (
 CREATE TABLE RoomsAreEquippedWithEquipment (
   BuildingNumber VARCHAR(5) NOT NULL,
   RoomNumber     VARCHAR(7) NOT NULL,
-  EType           VARCHAR(100) NOT NULL,
+  EId           INT NOT NULL,
   Quantity        INT NOT NULL DEFAULT 1,
-  PRIMARY KEY (BuildingNumber, RoomNumber, EType),
+  BackupPower          VARCHAR(3) NULL, -- 'Yes' or 'No',
+  PrimaryID INT NULL, -- name of person responsible for equipment
+  SecondaryID INT NULL, -- name of person responsible for equipment
+  PRIMARY KEY (BuildingNumber, RoomNumber, EId),
   CONSTRAINT fk_raew_room
     FOREIGN KEY (BuildingNumber, RoomNumber)
     REFERENCES Rooms(BuildingNumber, RoomNumber)
     ON UPDATE CASCADE
     ON DELETE CASCADE,
   CONSTRAINT fk_raew_equipment
-    FOREIGN KEY (EType) REFERENCES Equipment(EType)
+    FOREIGN KEY (EId) REFERENCES Equipment(EId)
     ON UPDATE CASCADE
-    ON DELETE RESTRICT
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_raew_primarycontact
+    FOREIGN KEY (PrimaryID) REFERENCES People(PersonID)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  CONSTRAINT fk_raew_secondarycontact
+    FOREIGN KEY (SecondaryID) REFERENCES People(PersonID)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
 );
 
 CREATE TABLE RoomsAreAssignedToDepts_Subdiv (
@@ -271,3 +303,25 @@ CREATE TABLE RoomsAreAssignedToDepts_Subdiv (
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
+
+CREATE TABLE RoomEquipmentActions (
+  BuildingNumber VARCHAR(5) NOT NULL,
+  RoomNumber     VARCHAR(7) NOT NULL,
+  EId           INT NOT NULL,
+  EventDuration VARCHAR(20) NOT NULL, -- 'Short-term' or 'Long-term' or 'Medium-term'
+  ActionID      INT NOT NULL,
+  PRIMARY KEY (BuildingNumber, RoomNumber, EId, EventDuration, ActionID),
+  CONSTRAINT fk_rea_room
+    FOREIGN KEY (BuildingNumber, RoomNumber)
+    REFERENCES Rooms(BuildingNumber, RoomNumber)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+  CONSTRAINT fk_rea_equipment
+    FOREIGN KEY (EId) REFERENCES Equipment(EId)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_rea_action
+    FOREIGN KEY (ActionID) REFERENCES Actions(ActionID)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT
+)

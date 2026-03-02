@@ -151,7 +151,7 @@ INSERT INTO RoomType (RoomUseCode, Name) VALUES
 ('970', 'House'),
 ('999', 'Code Not Given');
 
-INSERT INTO SpaceCode (SpaceCode, Name) VALUES
+INSERT INTO SpaceType (SpaceCode, Name) VALUES
 ('0',  'Unclassified & Nonassignable'),
 ('1',  'Classrooms'),
 ('2',  'Class Laboratories'),
@@ -179,3 +179,16 @@ INSERT INTO SpaceCode (SpaceCode, Name) VALUES
 ('24', 'Parking Garage'),
 ('25', 'Outside Organizations'),
 ('26', 'Need to Categorize');
+
+INSERT INTO FurnitureType (FurnitureCode, Name) VALUES
+('00', 'Unapplicable'),
+('01', 'Tbl/Ch'),
+('02', 'Tablet'),
+('03', 'Blt-In'),
+('04', 'Dsk/Ch'),
+('05', 'Audtrm'),
+('06', 'Tier/Otr Fx'),
+('07', 'Bed'),
+('08', 'Furn'),
+('09', 'Other'),
+('10', 'Computer Wrkst');

@@ -1,4 +1,4 @@
-INSERT INTO Roles (Role_ID, RoleName) VALUES)
+INSERT INTO Roles (Role_ID, RoleName) VALUES
     (1, 'God Level'),
     (2, 'College Update Level'),
     (3, 'Department Update Level'),
