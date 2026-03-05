@@ -19,7 +19,6 @@ def root():
 
 #checks if we can connect to database
 @app.get("/db-check")
-@app.get("/db-check")
 def db_check():
     if test_connection():
         return {"database_connection": "successful"}
