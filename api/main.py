@@ -22,12 +22,117 @@ class FloorPlan(BaseModel):
     BuildingNumber: str
     FloorNumber: int
 
+class Room(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+    TopLeftX: int
+    TopLeftY: int
+    BottomRightX: int
+    BottomRightY: int
+    DepartmentName: str
+
+class SelectedRoom(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+
+
+
 @app.get("/")
 def root():
     return {"Running API"}
 
+@app.get("/findroom/{buildingnumber}/{floornumber}", response_model=list[SelectedRoom])
+def find_room(buildingnumber: str, floornumber: int, x: int, y: int):
+    """
+    Find the selected room determined by the specified x and y coordinates. The returned room is usually the room within the bounding box,
+    but if x and y are one the border between bounding boxes, return the room with the smallest area
+    """
+
+    query = """
+    WITH getRooms AS (
+  SELECT
+    r.BuildingNumber AS BuildingNumber,
+    r.RoomNumber AS RoomNumber,
+    rc.TopLeftX AS TopLeftX,
+    rc.TopLeftY AS TopLeftY,
+    rc.BottomRightX AS BottomRightX,
+    rc.BottomRightY AS BottomRightY
+  FROM Rooms r
+  JOIN RoomCoordinates rc
+    ON r.BuildingNumber = rc.BuildingNumber
+   AND r.RoomNumber = rc.RoomNumber
+  WHERE r.BuildingNumber = %s
+    AND r.FloorNumber = %s
+    AND %s BETWEEN rc.TopLeftX AND rc.BottomRightX
+    AND %s BETWEEN rc.TopLeftY AND rc.BottomRightY
+),
+calcArea AS (
+  SELECT
+    *,
+    (ABS(BottomRightX - TopLeftX) * ABS(BottomRightY - TopLeftY)) AS RoomArea
+  FROM getRooms
+)
+SELECT BuildingNumber, RoomNumber
+FROM calcArea
+ORDER BY RoomArea ASC
+LIMIT 1;
+    """
+    conn = get_connection()
+    try:
+        curr = conn.cursor(dictionary=True)
+        curr.execute(query, (buildingnumber, floornumber, x, y))
+        rows = curr.fetchall()
+        return rows
+    
+    finally:
+        curr.close()
+        conn.close()
+
+@app.get("/rooms/{buildingnumber}/{floornumber}", response_model=list[Room])
+def get_rooms(buildingnumber: str, floornumber: int):
+    """
+    Input building number and floor number to get all available rooms
+    for that building on that floor
+    """
+    query = """
+SELECT
+  r.BuildingNumber,
+  r.RoomNumber,
+  rc.TopLeftX,
+  rc.TopLeftY,
+  rc.BottomRightX,
+  rc.BottomRightY,
+  d.DepartmentName
+FROM Rooms r
+JOIN RoomCoordinates rc
+  ON r.BuildingNumber = rc.BuildingNumber
+ AND r.RoomNumber = rc.RoomNumber
+JOIN RoomsAreAssignedToDepts_Subdiv ra
+  ON r.BuildingNumber = ra.BuildingNumber
+ AND r.RoomNumber = ra.RoomNumber
+JOIN Departments_Subdivisions d
+  ON ra.DeptID = d.DeptID
+  WHERE r.BuildingNumber = %s
+   AND r.FloorNumber = %s
+    """
+    conn = get_connection()
+    try:
+        curr = conn.cursor(dictionary=True)
+        curr.execute(query, (buildingnumber, floornumber))
+        rows = curr.fetchall()
+        return rows
+    
+    finally:
+        curr.close()
+        conn.close()
+
+
+
 @app.get("/floorplans", response_model=list[FloorPlan])
 def get_floor_plans():
+    """
+    Gets all avaialable floor plans
+    """
     query = """
     SELECT
         FileName AS URI,
