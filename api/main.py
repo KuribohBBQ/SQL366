@@ -336,7 +336,7 @@ def db_check():
     
 
 #List of Employees (getEmployees) 
-@app.get(/"getEmployees)", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
+@app.get(/"getEmployees", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
 def getEmployees(college: str, department: str):
     """
     Given a College name and Department/Subdivision name, returns employees in that dept,
@@ -397,6 +397,7 @@ def getEmployees(college: str, department: str):
         employees = cur.fetchall()
 
         if not employees:
+
             raise HTTPException(status_code=404, detail="No employees found for that college/department")
 
         emp_map = {}
