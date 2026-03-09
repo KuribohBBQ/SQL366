@@ -1,8 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, Depends
 import mysql.connector
 import os
 from dotenv import load_dotenv
-from database import get_connection, test_connection
+from .database import get_connection, test_connection
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 from fastapi import HTTPException
@@ -42,9 +42,9 @@ class Employee(BaseModel):
     Email: str
 
 class EquipmentInfo(BaseModel):
-    EquipmentName: str
-    Sensitive: int
-    NumofEquip: int
+    EType: str
+    IsSensitive: int
+    Quantity: int
 
 class RoomInfo(BaseModel):
     BuildingNumber: str
@@ -79,6 +79,7 @@ def validatePermission(required_permission: int, userId: int, affiliation: Dict[
         """
         cur.execute(query, (userId,))
         user = cur.fetchone()
+        print("DEBUG user row:", user)
         if not user:
             return False
         user_perm = user["RoleID"]
@@ -110,9 +111,17 @@ def validatePermission(required_permission: int, userId: int, affiliation: Dict[
 
         
 
+def require_permission(required_permission: int, affiliation: Dict[str, Any] | None = None):
+    affiliation = affiliation or {}
 
+    def _dep(userId: int = Query(..., description="UserID performing the action")):
+        if not validatePermission(required_permission, userId, affiliation):
+            raise HTTPException(status_code=403, detail="Permission denied")
+        return True
 
-@app.get("/getRoomInfo", response_model= RoomInfo)
+    return _dep
+
+@app.get("/getRoomInfo", response_model= RoomInfo, dependencies=[Depends(require_permission(5))])
 def getRoomInfo(buildingnumber: str, roomnumber: str):
     """
     Returns full information about a single room. Specific information includes:
@@ -189,7 +198,7 @@ def getRoomInfo(buildingnumber: str, roomnumber: str):
             pass
         conn.close()
 
-@app.get("/findRoom", response_model=list[SelectedRoom])
+@app.get("/findRoom", response_model=list[SelectedRoom], dependencies=[Depends(require_permission(5))])
 def find_room(buildingnumber: str, floornumber: int, x: int, y: int):
     """
     Find the selected room determined by the specified x and y coordinates. The returned room is usually the room within the bounding box,
@@ -236,7 +245,7 @@ LIMIT 1;
         curr.close()
         conn.close()
 
-@app.get("/getRooms", response_model=list[Room])
+@app.get("/getRooms", response_model=list[Room], dependencies=[Depends(require_permission(5))])
 def get_rooms(buildingnumber: str, floornumber: int):
     """
     Input building number and floor number to get all available rooms
@@ -276,7 +285,7 @@ JOIN Departments_Subdivisions d
 
 
 
-@app.get("/getFloorplans", response_model=list[FloorPlan])
+@app.get("/getFloorplans", response_model=list[FloorPlan], dependencies=[Depends(require_permission(5))])
 def get_floor_plans():
     """
     Gets all avaialable floor plans
@@ -306,7 +315,7 @@ def get_floor_plans():
 
 
 #checks if we can connect to database
-@app.get("/db-check")
+@app.get("/db-check", dependencies=[Depends(require_permission(3))])
 def db_check():
     if test_connection():
         return {"database_connection": "successful"}
