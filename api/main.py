@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query, Depends
 import mysql.connector
 import os
 from dotenv import load_dotenv
-from .database import get_connection, test_connection
+from database import get_connection, test_connection
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 from fastapi import HTTPException
@@ -59,6 +59,18 @@ class RoomInfo(BaseModel):
     Assignedppl: List[Employee] = []
     Equipment: List[EquipmentInfo] = []
 
+class EmployeeRoomShare(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+    EmployeeShareSquareFeet: float
+
+class EmployeeWithRooms(BaseModel):
+    FullName: str
+    Position: str
+    Email: str
+    Phone: Optional[str] = None
+    Rooms: List[EmployeeRoomShare] = []
+    TotalSpaceSquareFeet: float
 
 
 @app.get("/")
@@ -322,3 +334,104 @@ def db_check():
     else:
         return {"database_connection": "failed"}
     
+
+#List of Employees (getEmployees) 
+@app.get(/"getEmployees)", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
+def getEmployees(college: str, department: str):
+    """
+    Given a College name and Department/Subdivision name, returns employees in that dept,
+    including contact info, their rooms, and computed total space in their purview.
+    """
+    employee_query = """
+        SELECT
+            e.EmpID,
+            e.FullName,
+            e.Email,
+            e.Position,
+            e.Phone
+        FROM Employee e
+        JOIN Departments_Subdivisions d on e.DeptID = d.DeptID
+        WHERE d.College = %s
+            AND d.DepartmentName = %s
+        ORDER BY e.FullName
+    """
+
+    rooms_query = """
+        WITH occupants AS (
+            SELECT
+                eatr.BuildingNumber,
+                eatr.RoomNumber,
+                COUNT(*) as occupant_count
+            FROM EmployeesAssignedToRooms eatr
+            GROUP BY eatr.BuildingNumber, eatr.RoomNumber
+        )
+        SELECT
+            e.EmpID,
+            r.BuildingNumber,
+            r.RoomNumber,
+            r.SquareFeet,
+            o.occupant_count,
+            CASE
+                WHEN o.occupant_count = 1 THEN r.SquareFeet
+                ELSE r.SquareFEet / o.occupant_count
+            END AS employee_share
+        FROM Employee e
+        JOIN Departments_Subidivions d ON e.DeptID= d.DeptID
+        JOIN EmployeesAssignedToRooms eatr ON e.EmpID= eatr.EmpID
+        JOIN Rooms r
+          ON r.BuildingNumber = eatr.BuildingNumber
+         AND r.RoomNumber = ear.RoomNumber
+        JOIN occupants o
+        ON o.BuildingNumber = eatr.BuildingNumber
+        AND o.RoomNumber = eatr.RoomNumber
+        WHERE d.College = %s
+        AND d.DepartmentName = %s
+        ORDER BY e.EmpID, r.BuildingNumber, r.RoomNumber
+    """
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute(employee_query, (college, department))
+        employees = cur.fetchall()
+
+        if not employees:
+            raise HTTPException(status_code=404, detail="No employees found for that college/department")
+
+        emp_map = {}
+        for e in employees:
+            emp_map[e["EmpID"]] = {
+                "FullName": e["FullName"],
+                "Position": e["Position"],
+                "Email": e["Email"],
+                "Phone": e.get("Phone"),
+                "Rooms": [],
+                "TotalSpaceSquareFeet": 0.0,
+            }
+
+        cur.execute(rooms_query, (college, department))
+        room_rows = cur.fetchall()
+
+        for row in room_rows:
+            emp_id = row["EmpID"]
+            if emp_id not in emp_map:
+                continue
+
+            share = float(row["employee_share"]) if row["employee_share"] is not None else 0.0
+            emp_map[emp_id]["Rooms"].append({
+                "BuildingNumber": row["BuildingNumber"],
+                "RoomNumber": row["RoomNumber"],
+                "EmployeeShareSquareFeet": share,
+            })
+            emp_map[emp_id]["TotalSpaceSquareFeet"] += share
+
+        # Return as list in the same order as employee_query
+        return [emp_map[e["EmpID"]] for e in employees]
+
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
