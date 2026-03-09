@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query, Depends
 import mysql.connector
 import os
 from dotenv import load_dotenv
-from database import get_connection, test_connection
+from api.database import get_connection, test_connection
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 from fastapi import HTTPException
@@ -336,7 +336,7 @@ def db_check():
     
 
 #List of Employees (getEmployees) 
-@app.get(/"getEmployees", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
+@app.get("/getEmployees", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
 def getEmployees(college: str, department: str):
     """
     Given a College name and Department/Subdivision name, returns employees in that dept,
