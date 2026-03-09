@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 import mysql.connector
 import os
-import sqlalchemy
 from dotenv import load_dotenv
 from database import get_connection, test_connection
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from fastapi import HTTPException
+
 
 
 ## pip install these into system
@@ -64,6 +64,53 @@ class RoomInfo(BaseModel):
 @app.get("/")
 def root():
     return {"Running API"}
+
+def validatePermission(required_permission: int, userId: int, affiliation: Dict[str, Any]) -> bool:
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        query = """
+            SELECT u.Role_ID AS RoleID, d.DeptID AS DeptID, d.College AS College
+            FROM Users u
+            LEFT JOIN Employees e ON u.Email = e.Email
+            LEFT JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.UserID = %s
+            LIMIT 1
+        """
+        cur.execute(query, (userId,))
+        user = cur.fetchone()
+        if not user:
+            return False
+        user_perm = user["RoleID"]
+        if user_perm > required_permission:
+            return False
+        if not affiliation:
+            return True
+        
+        user_dept = user["DeptID"]
+        user_college = user["College"]
+
+        if "department" in affiliation:
+            dept_required = affiliation["department"]
+            if isinstance(dept_required, list):
+                if user_dept not in dept_required:
+                    return False
+            else:
+                if user_dept != dept_required:
+                    return False
+                
+        if "college" in affiliation:
+            if user_college != affiliation["college"]:
+                return False
+        
+        return True
+    finally:
+        cur.close()
+        conn.close()
+
+        
+
+
 
 @app.get("/getRoomInfo", response_model= RoomInfo)
 def getRoomInfo(buildingnumber: str, roomnumber: str):
@@ -142,7 +189,7 @@ def getRoomInfo(buildingnumber: str, roomnumber: str):
             pass
         conn.close()
 
-@app.get("/findroom", response_model=list[SelectedRoom])
+@app.get("/findRoom", response_model=list[SelectedRoom])
 def find_room(buildingnumber: str, floornumber: int, x: int, y: int):
     """
     Find the selected room determined by the specified x and y coordinates. The returned room is usually the room within the bounding box,
@@ -189,7 +236,7 @@ LIMIT 1;
         curr.close()
         conn.close()
 
-@app.get("/rooms", response_model=list[Room])
+@app.get("/getRooms", response_model=list[Room])
 def get_rooms(buildingnumber: str, floornumber: int):
     """
     Input building number and floor number to get all available rooms
@@ -229,7 +276,7 @@ JOIN Departments_Subdivisions d
 
 
 
-@app.get("/floorplans", response_model=list[FloorPlan])
+@app.get("/getFloorplans", response_model=list[FloorPlan])
 def get_floor_plans():
     """
     Gets all avaialable floor plans
