@@ -5,6 +5,8 @@ import sqlalchemy
 from dotenv import load_dotenv
 from database import get_connection, test_connection
 from pydantic import BaseModel, Field
+from typing import List, Optional
+from fastapi import HTTPException
 
 
 ## pip install these into system
@@ -35,15 +37,27 @@ class SelectedRoom(BaseModel):
     BuildingNumber: str
     RoomNumber: str
 
+class Employee(BaseModel):
+    FullName: str
+    Email: str
+
+class EquipmentInfo(BaseModel):
+    EquipmentName: str
+    Sensitive: int
+    NumofEquip: int
+
 class RoomInfo(BaseModel):
     BuildingNumber: str
     RoomNumber: str
     FloorNumber: int
-    RoomUseCode: int
-    SpaceCode: int
-    FurnitureCode: int
+    RoomUseCode: str
+    SpaceCode: str
+    FurnitureCode: str
     SquareFeet: float
     Notes: str
+    DepartmentName: str
+    Assignedppl: List[Employee] = []
+    Equipment: List[EquipmentInfo] = []
 
 
 
@@ -51,7 +65,82 @@ class RoomInfo(BaseModel):
 def root():
     return {"Running API"}
 
-@app.get("/getRoomInfo{buildingnumber}", response_model= list[RoomInfo])
+@app.get("/getRoomInfo", response_model= RoomInfo)
+def getRoomInfo(buildingnumber: str, roomnumber: str):
+    """
+    Returns full information about a single room. Specific information includes:
+    ● all individual attributes in the Rooms table of your database, including (even though this
+    might be redundant) the bounding box information, purpose of the room, and the room's
+    square footage.r
+    ● The name of the department that controls the room.
+    ● List of people assigned to the room. For each person, retrieve:
+    ○ Their full name
+    ○ Their email address
+    ○ Their rank and/or position (e.g., Assistant Professor or Financial Analyst)
+    ● List of equipment assigned to the room. For each type of equipment, retrieve:
+    ○ its name (e.g., "computer workstation")
+    ○ whether this type of equipment is considered sensitive
+    ○ count of the number of pieces of equipment of this type in the room
+    """
+    RoomInfoQuery = """
+    SELECT r.*, d.DepartmentName
+    FROM Rooms r
+    JOIN RoomsAreAssignedToDepts_Subdiv raatd ON r.BuildingNumber = raatd.BuildingNumber
+     AND r.RoomNumber =raatd.RoomNumber
+    JOIN Departments_Subdivisions d ON raatd.DeptID = d.DeptID
+    WHERE r.BuildingNumber = %s AND r.RoomNumber = %s
+    """
+    RoomEmployeeQuery = """
+    SELECT e.FullName, e.Email
+    FROM Employees e
+    JOIN EmployeesAssignedToRooms eatr
+     ON e.EmpID = eatr.EmpID
+    WHERE eatr.BuildingNumber = %s AND eatr.RoomNumber = %s
+    """
+    RoomEquipQuery = """
+    SELECT eq.EType, eq.IsSensitive, req.Quantity
+    FROM Equipment eq
+    JOIN RoomsAreEquippedWithEquipment req 
+     ON eq.EId = req.EId
+    WHERE req.BuildingNumber = %s AND req.RoomNumber = %s
+    """
+
+    conn = get_connection()
+    try:
+        #get room information and what department teaches in that room
+        cur = conn.cursor(dictionary=True)
+        cur.execute(RoomInfoQuery, (buildingnumber, roomnumber))
+        room = cur.fetchone()
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found")
+        
+        #get a list of all employees assigned to that room
+        cur.execute(RoomEmployeeQuery, (buildingnumber, roomnumber))
+        employees = cur.fetchall()
+
+        #get a list of all equipment in that room
+        cur.execute(RoomEquipQuery, (buildingnumber, roomnumber))
+        equipment = cur.fetchall()
+
+        return {
+            "BuildingNumber": room["BuildingNumber"],
+            "RoomNumber" : room["RoomNumber"],
+            "FloorNumber" : room["FloorNumber"],
+            "RoomUseCode" : room["RoomUseCode"],
+            "SpaceCode" : room["SpaceCode"],
+            "FurnitureCode": room["FurnitureCode"],
+            "SquareFeet" : room["SquareFeet"],
+            "Notes" : room["Notes"],
+            "DepartmentName": room["DepartmentName"],
+            "Assignedppl" : employees,
+            "Equipment" : equipment
+        }
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
 
 @app.get("/findroom", response_model=list[SelectedRoom])
 def find_room(buildingnumber: str, floornumber: int, x: int, y: int):
