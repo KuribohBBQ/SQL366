@@ -35,13 +35,25 @@ class SelectedRoom(BaseModel):
     BuildingNumber: str
     RoomNumber: str
 
+class RoomInfo(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+    FloorNumber: int
+    RoomUseCode: int
+    SpaceCode: int
+    FurnitureCode: int
+    SquareFeet: float
+    Notes: str
+
 
 
 @app.get("/")
 def root():
     return {"Running API"}
 
-@app.get("/findroom/{buildingnumber}/{floornumber}", response_model=list[SelectedRoom])
+@app.get("/getRoomInfo{buildingnumber}", response_model= list[RoomInfo])
+
+@app.get("/findroom", response_model=list[SelectedRoom])
 def find_room(buildingnumber: str, floornumber: int, x: int, y: int):
     """
     Find the selected room determined by the specified x and y coordinates. The returned room is usually the room within the bounding box,
@@ -88,7 +100,7 @@ LIMIT 1;
         curr.close()
         conn.close()
 
-@app.get("/rooms/{buildingnumber}/{floornumber}", response_model=list[Room])
+@app.get("/rooms", response_model=list[Room])
 def get_rooms(buildingnumber: str, floornumber: int):
     """
     Input building number and floor number to get all available rooms
