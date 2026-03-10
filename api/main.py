@@ -110,6 +110,54 @@ class DeptListEnhancedRow(BaseModel):
     NumRoomsWithDeptEmployees: int
     AssignedRoomsSquareFeet: float
     EmployeeAllocatedSquareFeet: float
+
+
+class DeptListRow(BaseModel):
+    DepartmentName: str
+    MainOfficeLocation: Optional[str] = None
+    DepartmentHead: Optional[str] = None
+    DepartmentType: str
+
+
+class AddEmployeeInput(BaseModel):
+    FullName: str
+    Email: str
+    DeptID: int
+    PositionTitle: Optional[str] = None
+
+
+class RoomAssignmentInput(BaseModel):
+    EmployeeEmail: str
+    BuildingNumber: str
+    RoomNumber: str
+
+
+class DepartmentAssignmentInput(BaseModel):
+    DeptID: int
+    BuildingNumber: str
+    RoomNumber: str
+
+
+class EquipmentAssignmentInput(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+    EType: str
+    NewCount: int
+
+
+class EquipmentTypeInput(BaseModel):
+    EType: str
+    IsSensitive: bool = False
+    EDescription: str = ""
+
+
+SUCCESS_CODE = "SUCCESS"
+ERR_UNAUTHORIZED = "ERR_UNAUTHORIZED"
+ERR_DUPLICATE = "ERR_DUPLICATE"
+ERR_FK_VIOLATION = "ERR_FK_VIOLATION"
+ERR_TYPE_MISMATCH = "ERR_TYPE_MISMATCH"
+ERR_LOGGING_FAILURE = "ERR_LOGGING_FAILURE"
+ERR_NOT_FOUND = "ERR_NOT_FOUND"
     
 
 @app.get("/")
@@ -136,6 +184,8 @@ def validatePermission(required_permission: int, userId: int, affiliation: Dict[
         user_perm = user["RoleID"]
         if user_perm > required_permission:
             return False
+        if user_perm == 1:
+            return True
         if not affiliation:
             return True
         
@@ -171,6 +221,121 @@ def require_permission(required_permission: int, affiliation: Dict[str, Any] | N
         return True
 
     return _dep
+
+
+@app.get("/validatePermission", tags=["Part0"], summary="Validate Permission")
+def validate_permission_endpoint(required_permission: int, userId: int, department: Optional[int] = None, college: Optional[str] = None):
+    affiliation: Dict[str, Any] = {}
+    if department is not None:
+        affiliation["department"] = [department]
+    if college:
+        affiliation["college"] = college
+    return {"allowed": validatePermission(required_permission, userId, affiliation)}
+
+
+def _error_result(code: str, message: str = "") -> Dict[str, Any]:
+    return {"ErrorCode": code, "Message": message}
+
+
+def _room_affiliation(conn, building_number: str, room_number: str) -> Dict[str, Any]:
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute(
+            """
+            SELECT ra.DeptID, d.College
+            FROM RoomsAreAssignedToDepts_Subdiv ra
+            JOIN Departments_Subdivisions d ON d.DeptID = ra.DeptID
+            WHERE ra.BuildingNumber = %s AND ra.RoomNumber = %s
+            """,
+            (building_number, room_number),
+        )
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+
+    dept_ids = [int(r["DeptID"]) for r in rows if r.get("DeptID") is not None]
+    colleges = sorted({str(r["College"]) for r in rows if r.get("College")})
+
+    affiliation: Dict[str, Any] = {}
+    if dept_ids:
+        affiliation["department"] = dept_ids
+    if len(colleges) == 1:
+        affiliation["college"] = colleges[0]
+    return affiliation
+
+
+def _dept_affiliation(conn, dept_id: int) -> Dict[str, Any]:
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute(
+            """
+            SELECT DeptID, College
+            FROM Departments_Subdivisions
+            WHERE DeptID = %s
+            LIMIT 1
+            """,
+            (dept_id,),
+        )
+        row = cur.fetchone()
+    finally:
+        cur.close()
+
+    if not row:
+        return {}
+    return {"department": [int(row["DeptID"])], "college": row["College"]}
+
+
+def _log_room_assignment_person(conn, user_id: int, building: str, room: str, emp_id: int, action: str) -> str:
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO Logs (UserID, AssignOrDelete, BuildingNumber, RoomNumber, EmpID)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (user_id, action[:10], building, room, emp_id),
+        )
+        return SUCCESS_CODE
+    except Exception:
+        return ERR_LOGGING_FAILURE
+    finally:
+        cur.close()
+
+
+def _log_equipment_assignment(conn, user_id: int, building: str, room: str, eid: int, after_count: int) -> str:
+    action = "Delete" if after_count == 0 else "Assign"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO Logs (UserID, AssignOrDelete, BuildingNumber, RoomNumber, EId, Quantity)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, action, building, room, eid, after_count),
+        )
+        return SUCCESS_CODE
+    except Exception:
+        return ERR_LOGGING_FAILURE
+    finally:
+        cur.close()
+
+
+def _log_room_dept_change(conn, user_id: int, building: str, room: str, to_dept: Optional[int]) -> str:
+    action = "Assign" if to_dept is not None else "Delete"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO Logs (UserID, AssignOrDelete, BuildingNumber, RoomNumber, DeptID)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (user_id, action, building, room, to_dept),
+        )
+        return SUCCESS_CODE
+    except Exception:
+        return ERR_LOGGING_FAILURE
+    finally:
+        cur.close()
 
 @app.get("/getRoomInfo", tags=["Rooms"], summary="Get Room Information", response_model= RoomInfo, dependencies=[Depends(require_permission(5))])
 def getRoomInfo(buildingnumber: str, roomnumber: str):
@@ -603,9 +768,7 @@ def getEquipmentLocation(etype: str):
             FROM Equipment eq
             JOIN RoomsAreEquippedWithEquipment req
               ON eq.EId = req.EId
-            JOIN Rooms r
-              ON 
-            WHERE r.EType LIKE %s
+            WHERE eq.EType LIKE %s
             GROUP BY req.BuildingNumber, req.RoomNumber
             ORDER BY req.BuildingNumber, req.RoomNumber
     """
@@ -683,6 +846,47 @@ def getSensitiveEquipmentLocations(college: str):
         }
     finally:
         cur.close()
+        conn.close()
+
+
+@app.get("/getDeptList", tags=["Rooms"], summary="Get Department List", response_model=List[DeptListRow], dependencies=[Depends(require_permission(5))])
+def getDeptList(college: str):
+    """
+    Basic department list for a college.
+    """
+    query = """
+        SELECT
+            d.DepartmentName,
+            MIN(CONCAT(ra.BuildingNumber, '-', ra.RoomNumber)) AS MainOfficeLocation
+        FROM Departments_Subdivisions d
+        LEFT JOIN RoomsAreAssignedToDepts_Subdiv ra
+          ON ra.DeptID = d.DeptID
+        WHERE d.College = %s
+        GROUP BY d.DeptID, d.DepartmentName
+        ORDER BY d.DepartmentName
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(query, (college,))
+        rows = cur.fetchall()
+
+        output = []
+        for row in rows:
+            output.append(
+                {
+                    "DepartmentName": row["DepartmentName"],
+                    "MainOfficeLocation": row["MainOfficeLocation"],
+                    "DepartmentHead": None,
+                    "DepartmentType": "Academic" if "science" in row["DepartmentName"].lower() else "Subdivision",
+                }
+            )
+        return output
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
         conn.close()
 
 @app.get("/getDeptListEnhanced", tags=["Rooms"], summary="Get Department Information", response_model=List[DeptListEnhancedRow], dependencies=[Depends(require_permission(5))])
@@ -805,5 +1009,396 @@ def getDeptListEnhanced(college: str):
             cur.close()
         except Exception:
             pass
+        conn.close()
+
+
+@app.post("/addEmployee", tags=["Part2"], summary="Add Employee")
+def addEmployee(userId: int, payload: AddEmployeeInput):
+    conn = get_connection()
+    try:
+        affiliation = _dept_affiliation(conn, payload.DeptID)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO Employees (Email, FullName, DeptID)
+            VALUES (%s, %s, %s)
+            """,
+            (payload.Email, payload.FullName, payload.DeptID),
+        )
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Employee added")
+    except mysql.connector.IntegrityError as exc:
+        conn.rollback()
+        if exc.errno == 1062:
+            return _error_result(ERR_DUPLICATE, "Duplicate employee/email")
+        if exc.errno in (1451, 1452):
+            return _error_result(ERR_FK_VIOLATION, "Invalid DeptID")
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/assignRoom", tags=["Part2"], summary="Assign Employee to Room")
+def assignRoom(userId: int, payload: RoomAssignmentInput):
+    conn = get_connection()
+    try:
+        affiliation = _room_affiliation(conn, payload.BuildingNumber, payload.RoomNumber)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT EmpID FROM Employees WHERE Email = %s LIMIT 1", (payload.EmployeeEmail,))
+        emp = cur.fetchone()
+        if not emp:
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+
+        cur.execute(
+            """
+            SELECT 1
+            FROM EmployeesAssignedToRooms
+            WHERE EmpID = %s AND BuildingNumber = %s AND RoomNumber = %s
+            LIMIT 1
+            """,
+            (emp["EmpID"], payload.BuildingNumber, payload.RoomNumber),
+        )
+        if cur.fetchone():
+            return _error_result(ERR_DUPLICATE, "Assignment already exists")
+
+        if _log_room_assignment_person(
+            conn, userId, payload.BuildingNumber, payload.RoomNumber, int(emp["EmpID"]), "Assign"
+        ) != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
+        cur2 = conn.cursor()
+        cur2.execute(
+            """
+            INSERT INTO EmployeesAssignedToRooms (EmpID, RoomNumber, BuildingNumber)
+            VALUES (%s, %s, %s)
+            """,
+            (emp["EmpID"], payload.RoomNumber, payload.BuildingNumber),
+        )
+        cur2.close()
+
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Assigned")
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/removeRoomAssignment", tags=["Part2"], summary="Remove Employee Room Assignment")
+def removeRoomAssignment(userId: int, payload: RoomAssignmentInput):
+    conn = get_connection()
+    try:
+        affiliation = _room_affiliation(conn, payload.BuildingNumber, payload.RoomNumber)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT EmpID FROM Employees WHERE Email = %s LIMIT 1", (payload.EmployeeEmail,))
+        emp = cur.fetchone()
+        if not emp:
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+
+        cur.execute(
+            """
+            SELECT 1
+            FROM EmployeesAssignedToRooms
+            WHERE EmpID = %s AND BuildingNumber = %s AND RoomNumber = %s
+            LIMIT 1
+            """,
+            (emp["EmpID"], payload.BuildingNumber, payload.RoomNumber),
+        )
+        if not cur.fetchone():
+            return _error_result(ERR_NOT_FOUND, "Assignment not found")
+
+        if _log_room_assignment_person(
+            conn, userId, payload.BuildingNumber, payload.RoomNumber, int(emp["EmpID"]), "Delete"
+        ) != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
+        cur2 = conn.cursor()
+        cur2.execute(
+            """
+            DELETE FROM EmployeesAssignedToRooms
+            WHERE EmpID = %s AND BuildingNumber = %s AND RoomNumber = %s
+            """,
+            (emp["EmpID"], payload.BuildingNumber, payload.RoomNumber),
+        )
+        cur2.close()
+
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Removed")
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/departmentAssignment", tags=["Part2"], summary="Assign Room to Department")
+def departmentAssignment(userId: int, payload: DepartmentAssignmentInput):
+    conn = get_connection()
+    try:
+        affiliation = _dept_affiliation(conn, payload.DeptID)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT DeptID
+            FROM RoomsAreAssignedToDepts_Subdiv
+            WHERE BuildingNumber = %s AND RoomNumber = %s
+            ORDER BY DeptID
+            """,
+            (payload.BuildingNumber, payload.RoomNumber),
+        )
+        old_rows = cur.fetchall()
+        old_dept = int(old_rows[0]["DeptID"]) if old_rows else None
+
+        if _log_room_dept_change(conn, userId, payload.BuildingNumber, payload.RoomNumber, payload.DeptID) != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
+        cur2 = conn.cursor()
+        cur2.execute(
+            """
+            DELETE FROM RoomsAreAssignedToDepts_Subdiv
+            WHERE BuildingNumber = %s AND RoomNumber = %s
+            """,
+            (payload.BuildingNumber, payload.RoomNumber),
+        )
+        cur2.execute(
+            """
+            INSERT INTO RoomsAreAssignedToDepts_Subdiv (BuildingNumber, RoomNumber, DeptID)
+            VALUES (%s, %s, %s)
+            """,
+            (payload.BuildingNumber, payload.RoomNumber, payload.DeptID),
+        )
+        cur2.close()
+
+        conn.commit()
+        return _error_result(SUCCESS_CODE, f"Changed from {old_dept} to {payload.DeptID}")
+    except mysql.connector.IntegrityError as exc:
+        conn.rollback()
+        if exc.errno in (1451, 1452):
+            return _error_result(ERR_FK_VIOLATION, "Invalid room or department")
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/assignEquipment", tags=["Part2"], summary="Assign Equipment Count to Room")
+def assignEquipment(userId: int, payload: EquipmentAssignmentInput):
+    conn = get_connection()
+    try:
+        affiliation = _room_affiliation(conn, payload.BuildingNumber, payload.RoomNumber)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+        if payload.NewCount < 0:
+            return _error_result(ERR_TYPE_MISMATCH, "NewCount must be >= 0")
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT EId FROM Equipment WHERE EType = %s LIMIT 1", (payload.EType,))
+        eq = cur.fetchone()
+        if not eq:
+            return _error_result(ERR_NOT_FOUND, "Equipment type not found")
+        eid = int(eq["EId"])
+
+        cur.execute(
+            """
+            SELECT Quantity
+            FROM RoomsAreEquippedWithEquipment
+            WHERE BuildingNumber = %s AND RoomNumber = %s AND EId = %s
+            LIMIT 1
+            """,
+            (payload.BuildingNumber, payload.RoomNumber, eid),
+        )
+        existing = cur.fetchone()
+        before_count = int(existing["Quantity"]) if existing else 0
+
+        if _log_equipment_assignment(conn, userId, payload.BuildingNumber, payload.RoomNumber, eid, payload.NewCount) != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
+        cur2 = conn.cursor()
+        if payload.NewCount == 0:
+            cur2.execute(
+                """
+                DELETE FROM RoomsAreEquippedWithEquipment
+                WHERE BuildingNumber = %s AND RoomNumber = %s AND EId = %s
+                """,
+                (payload.BuildingNumber, payload.RoomNumber, eid),
+            )
+        elif before_count == 0:
+            cur2.execute(
+                """
+                INSERT INTO RoomsAreEquippedWithEquipment (BuildingNumber, RoomNumber, EId, Quantity)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (payload.BuildingNumber, payload.RoomNumber, eid, payload.NewCount),
+            )
+        else:
+            cur2.execute(
+                """
+                UPDATE RoomsAreEquippedWithEquipment
+                SET Quantity = %s
+                WHERE BuildingNumber = %s AND RoomNumber = %s AND EId = %s
+                """,
+                (payload.NewCount, payload.BuildingNumber, payload.RoomNumber, eid),
+            )
+        cur2.close()
+
+        conn.commit()
+        return _error_result(SUCCESS_CODE, f"Equipment count changed {before_count} -> {payload.NewCount}")
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/addEquipmentType", tags=["Part2"], summary="Add Equipment Type")
+def addEquipmentType(userId: int, payload: EquipmentTypeInput):
+    conn = get_connection()
+    try:
+        if not validatePermission(2, userId, {}):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO Equipment (EType, EDescription, IsSensitive)
+            VALUES (%s, %s, %s)
+            """,
+            (payload.EType, payload.EDescription, 1 if payload.IsSensitive else 0),
+        )
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Equipment type added")
+    except mysql.connector.IntegrityError as exc:
+        conn.rollback()
+        if exc.errno == 1062:
+            return _error_result(ERR_DUPLICATE, "Duplicate equipment type")
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/logLogin", tags=["Part3"], summary="Log Login")
+def logLogin(userId: int):
+    conn = get_connection()
+    try:
+        if not validatePermission(5, userId, {}):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+        cur = conn.cursor()
+        cur.execute("INSERT INTO Logs (UserID) VALUES (%s)", (userId,))
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Login logged")
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_LOGGING_FAILURE, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/logLogout", tags=["Part3"], summary="Log Logout")
+def logLogout(userId: int):
+    conn = get_connection()
+    try:
+        if not validatePermission(5, userId, {}):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+        cur = conn.cursor()
+        cur.execute("INSERT INTO Logs (UserID, LogOut) VALUES (%s, CURTIME())", (userId,))
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Logout logged")
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_LOGGING_FAILURE, str(exc))
+    finally:
+        conn.close()
+
+
+@app.post("/logRoomAssignmentPerson", tags=["Part3"], summary="Log Room Assignment Person")
+def logRoomAssignmentPerson(userId: int, buildingNumber: str, roomNumber: str, employeeEmail: str, actionType: str):
+    conn = get_connection()
+    try:
+        affiliation = _room_affiliation(conn, buildingNumber, roomNumber)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT EmpID FROM Employees WHERE Email = %s LIMIT 1", (employeeEmail,))
+        emp = cur.fetchone()
+        if not emp:
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+
+        code = _log_room_assignment_person(conn, userId, buildingNumber, roomNumber, int(emp["EmpID"]), actionType)
+        if code != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Log insert failed")
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Logged")
+    finally:
+        conn.close()
+
+
+@app.post("/logEquipmentAssignment", tags=["Part3"], summary="Log Equipment Assignment")
+def logEquipmentAssignment(userId: int, buildingNumber: str, roomNumber: str, etype: str, beforeCount: int, afterCount: int):
+    conn = get_connection()
+    try:
+        affiliation = _room_affiliation(conn, buildingNumber, roomNumber)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT EId FROM Equipment WHERE EType = %s LIMIT 1", (etype,))
+        eq = cur.fetchone()
+        if not eq:
+            return _error_result(ERR_NOT_FOUND, "Equipment type not found")
+
+        code = _log_equipment_assignment(conn, userId, buildingNumber, roomNumber, int(eq["EId"]), afterCount)
+        if code != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Log insert failed")
+        conn.commit()
+        return _error_result(SUCCESS_CODE, f"Logged before={beforeCount}, after={afterCount}")
+    finally:
+        conn.close()
+
+
+@app.post("/logRoomDeptChange", tags=["Part3"], summary="Log Room Department Change")
+def logRoomDeptChange(userId: int, buildingNumber: str, roomNumber: str, fromDept: Optional[int] = None, toDept: Optional[int] = None):
+    conn = get_connection()
+    try:
+        affiliation = _room_affiliation(conn, buildingNumber, roomNumber)
+        if toDept is not None:
+            affiliation = _dept_affiliation(conn, toDept)
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        code = _log_room_dept_change(conn, userId, buildingNumber, roomNumber, toDept)
+        if code != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Log insert failed")
+        conn.commit()
+        return _error_result(SUCCESS_CODE, f"Logged from={fromDept} to={toDept}")
+    finally:
         conn.close()
 

@@ -1,0 +1,5 @@
+settings.config
+demo_output.txt
+.pytest_cache/
+__pycache__/
+*.pyc
