@@ -84,6 +84,11 @@ class EmployeeInfoResponse(BaseModel):
     TotalSpaceSquareFeet: float
     Rooms: List[EmployeeRoomDetail] = []
 
+class EquipmentLocation(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+    Quantity: int
+
 
 @app.get("/")
 def root():
@@ -564,4 +569,33 @@ def compute_employee_share(room_sqft: float, occupant_count: int) -> float:
         return float(room_sqft)
     return float(room_sqft) / float(occupant_count)
     
+
+app.get("/getEquipmentLocation", response_model=EquipmentLocation, dependencies=[Depends(require_permission(5))])
+def getEquipmentLocation(type: str):
+    
+    query ="""
+            SELECT 
+                req.BuildingNumber,
+                req.RoomNumber,
+                SUM(req.Quantity) AS Quantity
+            FROM Equipment eq
+            JOIN RoomsAreEquippedWithEquipment req
+              ON eq.EId = req.EId
+            WHERE eq.EType LIKE %s
+            GROUP BY req.BuildingNumber, req.RoomNumber
+            ORDER BY req.BuildingNumber, req.RoomNumber
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(query, (f"%{etype}%",))
+        rows = cur.fetchall()
+        return rows
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
+
 
