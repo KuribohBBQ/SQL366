@@ -150,22 +150,16 @@ def require_permission(required_permission: int, affiliation: Dict[str, Any] | N
 
     return _dep
 
-@app.get("/getRoomInfo", response_model= RoomInfo, dependencies=[Depends(require_permission(5))])
+@app.get("/getRoomInfo", tags=["Rooms"], summary="Get Room Information", response_model= RoomInfo, dependencies=[Depends(require_permission(5))])
 def getRoomInfo(buildingnumber: str, roomnumber: str):
     """
-    Returns full information about a single room. Specific information includes:
-    ● all individual attributes in the Rooms table of your database, including (even though this
-    might be redundant) the bounding box information, purpose of the room, and the room's
-    square footage.r
-    ● The name of the department that controls the room.
-    ● List of people assigned to the room. For each person, retrieve:
-    ○ Their full name
-    ○ Their email address
-    ○ Their rank and/or position (e.g., Assistant Professor or Financial Analyst)
-    ● List of equipment assigned to the room. For each type of equipment, retrieve:
-    ○ its name (e.g., "computer workstation")
-    ○ whether this type of equipment is considered sensitive
-    ○ count of the number of pieces of equipment of this type in the room
+    Given a room and building number, it returns all information about that room.
+    Specific information would include:
+      all attribute of the room,
+      name of assigned department,
+      list of people assigned to the room, 
+      and information for all those people,
+      types of equipment, their types, and quantities.
     """
     RoomInfoQuery = """
     SELECT r.*, d.DepartmentName
@@ -227,7 +221,7 @@ def getRoomInfo(buildingnumber: str, roomnumber: str):
             pass
         conn.close()
 
-@app.get("/findRoom", response_model=list[SelectedRoom], dependencies=[Depends(require_permission(5))])
+@app.get("/findRoom", tags=["Rooms"], response_model=list[SelectedRoom], dependencies=[Depends(require_permission(5))])
 def find_room(buildingnumber: str, floornumber: int, x: int, y: int):
     """
     Find the selected room determined by the specified x and y coordinates. The returned room is usually the room within the bounding box,
@@ -274,7 +268,7 @@ LIMIT 1;
         curr.close()
         conn.close()
 
-@app.get("/getRooms", response_model=list[Room], dependencies=[Depends(require_permission(5))])
+@app.get("/getRooms", tags=["Rooms"], response_model=list[Room], dependencies=[Depends(require_permission(5))])
 def get_rooms(buildingnumber: str, floornumber: int):
     """
     Input building number and floor number to get all available rooms
@@ -314,10 +308,10 @@ JOIN Departments_Subdivisions d
 
 
 
-@app.get("/getFloorplans", response_model=list[FloorPlan], dependencies=[Depends(require_permission(5))])
+@app.get("/getFloorplans", tags=["Floorplans"], response_model=list[FloorPlan], dependencies=[Depends(require_permission(5))])
 def get_floor_plans():
     """
-    Gets all avaialable floor plans
+    Gets all available floor plans
     """
     query = """
     SELECT
@@ -353,7 +347,7 @@ def db_check():
     
 
 #List of Employees (getEmployees) 
-@app.get("/getEmployees", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
+@app.get("/getEmployees", tags=["Employees"], summary="Get All Employees", response_model=List[EmployeeWithRooms], dependencies=[Depends(require_permission(5))])
 def getEmployees(college: str, department: str):
     """
     Given a College name and Department/Subdivision name, returns employees in that dept,
@@ -451,12 +445,15 @@ def getEmployees(college: str, department: str):
         conn.close()
 
 
-@app.get("/getEmployeeInfo", response_model=EmployeeInfoResponse, dependencies=[Depends(require_permission(5))])
+@app.get("/getEmployeeInfo", tags=["Employees"], summary= "Get Employee Information", response_model=EmployeeInfoResponse, dependencies=[Depends(require_permission(5))])
 def getEmployeeInfo(
     email: Optional[str] = None,
     name: Optional[str] = None,
     department: Optional[str] = None,
 ):
+    """
+    Input email or name and department of employee you are looking for
+    """
     if not email and not (name and department):
         raise HTTPException(
             status_code=422,
@@ -570,9 +567,12 @@ def compute_employee_share(room_sqft: float, occupant_count: int) -> float:
     return float(room_sqft) / float(occupant_count)
     
 
-app.get("/getEquipmentLocation", response_model=EquipmentLocation, dependencies=[Depends(require_permission(5))])
+@app.get("/getEquipmentLocations", tags=["Equipment"], summary=" Get Equipment Locations", response_model=EquipmentLocation, dependencies=[Depends(require_permission(5))])
 def getEquipmentLocation(type: str):
-    
+    """
+    Input equipment type to get all rooms
+    that have that equipment type
+    """
     query ="""
             SELECT 
                 req.BuildingNumber,
