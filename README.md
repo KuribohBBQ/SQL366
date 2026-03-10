@@ -26,7 +26,7 @@ database=yottabank
 host=mysql.labthreesixfive.com
 port=3306
 user=yottabank
-password=YOUR_PASSWORD
+password=should-I-actually-write-the-password?????
 database=yottabank
 ```
 
