@@ -1,0 +1,6 @@
+[mysql]
+host=mysql.labthreesixfive.com
+port=3306
+user=yottabank
+password=REPLACE_ME
+database=yottabank
