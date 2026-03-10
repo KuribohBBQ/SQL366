@@ -33,7 +33,7 @@ python -m pip install fastapi mysql-connector-python python-dotenv pytest httpx
 run tests:
 
 ```bash
-python -m pytest -q
+python -m pytest -q tests
 ```
 
 run harness:
@@ -55,4 +55,3 @@ python lab4_harness.py > demo_output.txt
 - calls update endpoint
 - shows one permission fail case
 - calls log endpoints
-
