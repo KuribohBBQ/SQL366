@@ -89,6 +89,10 @@ class EquipmentLocation(BaseModel):
     RoomNumber: str
     Quantity: int
 
+class EquipmentLocationsResponse(BaseModel):
+    EType: str
+    Locations: List[EquipmentLocation]
+
 
 @app.get("/")
 def root():
@@ -567,8 +571,8 @@ def compute_employee_share(room_sqft: float, occupant_count: int) -> float:
     return float(room_sqft) / float(occupant_count)
     
 
-@app.get("/getEquipmentLocations", tags=["Equipment"], summary=" Get Equipment Locations", response_model=EquipmentLocation, dependencies=[Depends(require_permission(5))])
-def getEquipmentLocation(type: str):
+@app.get("/getEquipmentLocations", tags=["Equipment"], summary=" Get Equipment Locations", response_model=EquipmentLocationsResponse, dependencies=[Depends(require_permission(5))])
+def getEquipmentLocation(etype: str):
     """
     Input equipment type to get all rooms
     that have that equipment type
@@ -590,7 +594,12 @@ def getEquipmentLocation(type: str):
         cur = conn.cursor(dictionary=True)
         cur.execute(query, (f"%{etype}%",))
         rows = cur.fetchall()
-        return rows
+        for r in rows:
+            r["Quantity"] = int(r["Quantity"])
+        return {
+            "EType": etype,
+            "Locations": rows
+        }
     finally:
         try:
             cur.close()
