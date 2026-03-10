@@ -36,6 +36,10 @@ class FakeCursor:
     def fetchall(self):
         q = self.last_query
 
+       # /getEmployees room shares (rooms_query)
+        if "WITH occupants AS" in q and "employee_share" in q:
+            return self.script.get("EmployeeRoomShare_rows", [])
+
         # /getRoomInfo employees list
         if "FROM Employees e" in q and "EmployeesAssignedToRooms" in q:
             return self.script.get("RoomEmployees_rows", [])
@@ -57,12 +61,9 @@ class FakeCursor:
             return self.script.get("getFloorplans_rows", [])
         
         # /getEmployees employee list
-        if "FROM Employee e" in q and "JOIN Departments_Subdivisions" in q and "WHERE d.College" in q:
+        if "FROM Employees e" in q and "JOIN Departments_Subdivisions" in q and "WHERE d.College" in q:
             return self.script.get("Employees_rows", [])
 
-        # /getEmployees room shares
-        if "FROM Employees" in q and "SquareFeet" in q:
-            return self.script.get("EmployeeRoomShare_rows", [])
 
         return []
 
