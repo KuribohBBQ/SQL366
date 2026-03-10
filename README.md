@@ -17,7 +17,7 @@ Create a file named `settings.config` in the repo root with either format below.
 host=mysql.labthreesixfive.com
 port=3306
 user=yottabank
-password=YOUR_PASSWORD
+password=should-I-actually-write-the-password?????
 database=yottabank
 ```
 
