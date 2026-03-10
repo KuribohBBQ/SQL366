@@ -93,6 +93,16 @@ class EquipmentLocationsResponse(BaseModel):
     EType: str
     Locations: List[EquipmentLocation]
 
+class SensitiveEquipmentGroup(BaseModel):
+    EType: str
+    TotalQuantity: int
+    Locations: List[EquipmentLocation] = []
+
+class SensitiveEquipmentByCollegeResponse(BaseModel):
+    College: str
+    RoomCount: int
+    SensitiveEquipment: List[SensitiveEquipmentGroup] = []
+    
 
 @app.get("/")
 def root():
@@ -279,25 +289,25 @@ def get_rooms(buildingnumber: str, floornumber: int):
     for that building on that floor
     """
     query = """
-SELECT
-  r.BuildingNumber,
-  r.RoomNumber,
-  rc.TopLeftX,
-  rc.TopLeftY,
-  rc.BottomRightX,
-  rc.BottomRightY,
-  d.DepartmentName
-FROM Rooms r
-JOIN RoomCoordinates rc
-  ON r.BuildingNumber = rc.BuildingNumber
- AND r.RoomNumber = rc.RoomNumber
-JOIN RoomsAreAssignedToDepts_Subdiv ra
-  ON r.BuildingNumber = ra.BuildingNumber
- AND r.RoomNumber = ra.RoomNumber
-JOIN Departments_Subdivisions d
-  ON ra.DeptID = d.DeptID
-  WHERE r.BuildingNumber = %s
-   AND r.FloorNumber = %s
+        SELECT
+            r.BuildingNumber,
+            r.RoomNumber,
+            rc.TopLeftX,
+            rc.TopLeftY,
+            rc.BottomRightX,
+            rc.BottomRightY,
+            d.DepartmentName
+        FROM Rooms r
+        JOIN RoomCoordinates rc
+        ON r.BuildingNumber = rc.BuildingNumber
+        AND r.RoomNumber = rc.RoomNumber
+        JOIN RoomsAreAssignedToDepts_Subdiv ra
+        ON r.BuildingNumber = ra.BuildingNumber
+        AND r.RoomNumber = ra.RoomNumber
+        JOIN Departments_Subdivisions d
+        ON ra.DeptID = d.DeptID
+        WHERE r.BuildingNumber = %s
+        AND r.FloorNumber = %s
     """
     conn = get_connection()
     try:
@@ -585,7 +595,9 @@ def getEquipmentLocation(etype: str):
             FROM Equipment eq
             JOIN RoomsAreEquippedWithEquipment req
               ON eq.EId = req.EId
-            WHERE eq.EType LIKE %s
+            JOIN Rooms r
+              ON 
+            WHERE r.EType LIKE %s
             GROUP BY req.BuildingNumber, req.RoomNumber
             ORDER BY req.BuildingNumber, req.RoomNumber
     """
@@ -605,6 +617,64 @@ def getEquipmentLocation(etype: str):
             cur.close()
         except Exception:
             pass
+        conn.close()
+
+@app.get("/getSensitiveEquipmentLocations", tags=["Equipment"], summary="Get Sensitive Equipment Report by College", response_model=SensitiveEquipmentByCollegeResponse, dependencies=[Depends(require_permission(5))])
+def getSensitiveEquipmentLocations(college: str):
+    """
+        Input a college and all sensitive equipment that belongs to that college will be returned.
+    """
+
+    query = """
+        SELECT
+            d.College AS College,
+            eq.EType AS EType,
+            req.BuildingNumber AS BuildingNumber,
+            req.RoomNumber AS RoomNumber,
+            SUM(req.Quantity) AS Quantity
+        FROM RoomsAreEquippedWithEquipment req
+        JOIN Equipment eq
+          ON eq.EId = req.EId
+        JOIN RoomsAreAssignedToDepts_Subdiv ra
+          ON ra.BuildingNumber = req.BuildingNumber
+         AND ra.RoomNumber = req.RoomNumber
+        JOIN Departments_Subdivisions d
+          ON d.DeptID = ra.DeptID
+        WHERE eq.IsSensitive = 1
+          AND d.College = %s
+        GROUP BY d.College, eq.EType, req.BuildingNumber, req.RoomNumber
+        ORDER BY eq.EType, req.BuildingNumber, req.RoomNumber;
+    """
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(query, (college,))
+        rows = cur.fetchall()
+
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for r in rows:
+            etype = r["EType"]
+            groups.setdefault(etype, []).append({
+                "BuildingNumber": r["BuildingNumber"],
+                "RoomNumber": r["RoomNumber"],
+                "Quantity": int(r["Quantity"]),
+            })
+
+        sensitive_equipment = []
+        for etype in sorted(groups.keys()):
+            locs = groups[etype]
+            total = sum(loc["Quantity"] for loc in locs)
+            sensitive_equipment.append({"EType": etype, "TotalQuantity": total, "Locations": locs})
+
+        room_set = {(loc["BuildingNumber"], loc["RoomNumber"]) for locs in groups.values() for loc in locs}
+        return {
+            "College": college,
+            "RoomCount": int(len(room_set)),
+            "SensitiveEquipment": sensitive_equipment,
+        }
+    finally:
+        cur.close()
         conn.close()
 
 
