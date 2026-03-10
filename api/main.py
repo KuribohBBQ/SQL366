@@ -102,6 +102,14 @@ class SensitiveEquipmentByCollegeResponse(BaseModel):
     College: str
     RoomCount: int
     SensitiveEquipment: List[SensitiveEquipmentGroup] = []
+
+class DeptListEnhancedRow(BaseModel):
+    DeptID: int
+    DepartmentName: str
+    NumAssignedRooms: int
+    NumRoomsWithDeptEmployees: int
+    AssignedRoomsSquareFeet: float
+    EmployeeAllocatedSquareFeet: float
     
 
 @app.get("/")
@@ -677,4 +685,125 @@ def getSensitiveEquipmentLocations(college: str):
         cur.close()
         conn.close()
 
+@app.get("/getDeptListEnhanced", tags=["Rooms"], summary="Get Department Information", response_model=List[DeptListEnhancedRow], dependencies=[Depends(require_permission(5))])
+def getDeptListEnhanced(college: str):
+    """
+        Input a college and returns all information about departments and their number of assigned rooms, square footage of assigned rooms, 
+        rooms where at least one employee of that department is assigned, and square footage assigned to department employees.
+    """
+
+    dept_query = """
+        SELECT DeptID, DepartmentName
+        FROM Departments_Subdivisions
+        WHERE College = %s
+        ORDER BY DepartmentName;
+    """
+
+    deptrm_query = """
+        SELECT
+            ra.DeptID,
+          COUNT(DISTINCT CONCAT(ra.BuildingNumber,'|',ra.RoomNumber)) AS NumAssignedRooms,
+          COALESCE(SUM(r.SquareFeet), 0) AS AssignedRoomsSquareFeet
+        FROM RoomsAreAssignedToDepts_Subdiv ra
+        JOIN Rooms r
+          ON r.BuildingNumber = ra.BuildingNumber
+         AND r.RoomNumber = ra.RoomNumber
+        JOIN Departments_Subdivisions d
+          ON d.DeptID = ra.DeptID
+        WHERE d.College = %s
+        GROUP BY ra.DeptID;
+    """
+
+    rmtoemp_query = """
+        SELECT
+            e.DeptID,
+            COUNT(DISTINCT CONCAT(eatr.BuildingNumber,'|',eatr.RoomNumber)) AS NumRoomsWithDeptEmployees
+        FROM Employees e
+        JOIN Departments_Subdivisions d
+          ON d.DeptID = e.DeptID
+        JOIN EmployeesAssignedToRooms eatr
+          ON eatr.EmpID = e.EmpID
+        WHERE d.College = %s
+        GROUP BY e.DeptID;
+    """
+
+    sqfttoemp_query = """
+        WITH occupants AS (
+            SELECT
+            BuildingNumber,
+            RoomNumber,
+            COUNT(*) AS occupant_count
+          FROM EmployeesAssignedToRooms
+          GROUP BY BuildingNumber, RoomNumber
+        )
+        SELECT
+          e.DeptID,
+          COALESCE(SUM(
+            CASE
+              WHEN o.occupant_count <= 1 THEN r.SquareFeet
+              ELSE r.SquareFeet / o.occupant_count
+            END
+         ), 0) AS EmployeeAllocatedSquareFeet
+        FROM Employees e
+        JOIN Departments_Subdivisions d
+          ON d.DeptID = e.DeptID
+        JOIN EmployeesAssignedToRooms eatr
+          ON eatr.EmpID = e.EmpID
+        JOIN Rooms r
+          ON r.BuildingNumber = eatr.BuildingNumber
+         AND r.RoomNumber = eatr.RoomNumber
+        JOIN occupants o
+          ON o.BuildingNumber = eatr.BuildingNumber
+         AND o.RoomNumber = eatr.RoomNumber
+        WHERE d.College = %s
+        GROUP BY e.DeptID;
+    """
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(dept_query, (college,))
+        depts = cur.fetchall()
+
+        if not depts:
+            return []
+        
+        dept_map = {}
+        for drow in depts:
+            dept_id = drow["DeptID"]
+            dept_map[dept_id] = {
+                "DeptID": dept_id,
+                "DepartmentName": drow["DepartmentName"],
+                "NumAssignedRooms": 0,
+                "NumRoomsWithDeptEmployees": 0,
+                "AssignedRoomsSquareFeet": 0.0,
+                "EmployeeAllocatedSquareFeet": 0.0,
+            }
+
+        cur.execute(deptrm_query, (college,))
+        for r in cur.fetchall():
+            dept_id = r["DeptID"]
+            if dept_id in dept_map:
+                dept_map[dept_id]["NumAssignedRooms"] = int(r["NumAssignedRooms"])
+                dept_map[dept_id]["AssignedRoomsSquareFeet"] = float(r["AssignedRoomsSquareFeet"])
+
+        cur.execute(rmtoemp_query, (college,))
+        for r in cur.fetchall():
+            dept_id = r["DeptID"]
+            if dept_id in dept_map:
+                dept_map[dept_id]["NumRoomsWithDeptEmployees"] = int(r["NumRoomsWithDeptEmployees"])
+
+        cur.execute(sqfttoemp_query, (college,))
+        for r in cur.fetchall():
+            dept_id = r["DeptID"]
+            if dept_id in dept_map:
+                dept_map[dept_id]["EmployeeAllocatedSquareFeet"] = float(r["EmployeeAllocatedSquareFeet"])
+
+        return [dept_map[drow["DeptID"]] for drow in depts]
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
 
