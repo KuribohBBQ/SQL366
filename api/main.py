@@ -66,11 +66,23 @@ class EmployeeRoomShare(BaseModel):
 
 class EmployeeWithRooms(BaseModel):
     FullName: str
-    Position: str
     Email: str
-    Phone: Optional[str] = None
     Rooms: List[EmployeeRoomShare] = []
     TotalSpaceSquareFeet: float
+
+class EmployeeRoomDetail(BaseModel):
+    BuildingNumber: str
+    RoomNumber: str
+    RoomType: str
+    RoomSquareFeet: float
+    EmployeeShareSquareFeet: float
+
+class EmployeeInfoResponse(BaseModel):
+    FullName: str
+    DepartmentName: str
+    Email: str
+    TotalSpaceSquareFeet: float
+    Rooms: List[EmployeeRoomDetail] = []
 
 
 @app.get("/")
@@ -346,10 +358,8 @@ def getEmployees(college: str, department: str):
         SELECT
             e.EmpID,
             e.FullName,
-            e.Email,
-            e.Position,
-            e.Phone
-        FROM Employee e
+            e.Email
+        FROM Employees e
         JOIN Departments_Subdivisions d on e.DeptID = d.DeptID
         WHERE d.College = %s
             AND d.DepartmentName = %s
@@ -361,7 +371,7 @@ def getEmployees(college: str, department: str):
             SELECT
                 eatr.BuildingNumber,
                 eatr.RoomNumber,
-                COUNT(*) as occupant_count
+                COUNT(*) AS occupant_count
             FROM EmployeesAssignedToRooms eatr
             GROUP BY eatr.BuildingNumber, eatr.RoomNumber
         )
@@ -373,19 +383,19 @@ def getEmployees(college: str, department: str):
             o.occupant_count,
             CASE
                 WHEN o.occupant_count = 1 THEN r.SquareFeet
-                ELSE r.SquareFEet / o.occupant_count
+                ELSE r.SquareFeet / o.occupant_count
             END AS employee_share
-        FROM Employee e
-        JOIN Departments_Subidivions d ON e.DeptID= d.DeptID
-        JOIN EmployeesAssignedToRooms eatr ON e.EmpID= eatr.EmpID
+        FROM Employees e
+        JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+        JOIN EmployeesAssignedToRooms eatr ON e.EmpID = eatr.EmpID
         JOIN Rooms r
           ON r.BuildingNumber = eatr.BuildingNumber
-         AND r.RoomNumber = ear.RoomNumber
+         AND r.RoomNumber = eatr.RoomNumber
         JOIN occupants o
-        ON o.BuildingNumber = eatr.BuildingNumber
-        AND o.RoomNumber = eatr.RoomNumber
+          ON o.BuildingNumber = eatr.BuildingNumber
+         AND o.RoomNumber = eatr.RoomNumber
         WHERE d.College = %s
-        AND d.DepartmentName = %s
+          AND d.DepartmentName = %s
         ORDER BY e.EmpID, r.BuildingNumber, r.RoomNumber
     """
 
@@ -404,9 +414,7 @@ def getEmployees(college: str, department: str):
         for e in employees:
             emp_map[e["EmpID"]] = {
                 "FullName": e["FullName"],
-                "Position": e["Position"],
                 "Email": e["Email"],
-                "Phone": e.get("Phone"),
                 "Rooms": [],
                 "TotalSpaceSquareFeet": 0.0,
             }
@@ -436,3 +444,124 @@ def getEmployees(college: str, department: str):
         except Exception:
             pass
         conn.close()
+
+
+@app.get("/getEmployeeInfo", response_model=EmployeeInfoResponse, dependencies=[Depends(require_permission(5))])
+def getEmployeeInfo(
+    email: Optional[str] = None,
+    name: Optional[str] = None,
+    department: Optional[str] = None,
+):
+    if not email and not (name and department):
+        raise HTTPException(
+            status_code=422,
+            detail="Provide either email=... OR name...&department=..."
+        )
+    
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+
+        if email:
+            emp_query = """
+                SELECT 
+                    e.EmpID,
+                    e.FullName,
+                    e.Email,
+                    d.DepartmentName
+                FROM Employees e
+                JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+                WHERE e.Email = %s
+                LIMIT 1
+            """
+
+            cur.execute(emp_query, (email,))
+        else:
+            emp_query = """
+                SELECT
+                    e.EmpID,
+                    e.FullName,
+                    e.Email,
+                    d.DepartmentName
+                FROM Employees e
+                JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+                WHERE e.FullName = %s
+                  AND d.DepartmentName = %s
+                LIMIT 1
+            """
+            cur.execute(emp_query, (name, department))
+        emp = cur.fetchone()
+        if not emp:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        
+        emp_id = emp["EmpID"]
+
+        rooms_query = """
+            WITH occupants AS (
+                SELECT
+                    eatr.BuildingNumber,
+                    eatr.RoomNumber,
+                    COUNT(*) AS occupant_count
+                FROM EmployeesAssignedToRooms eatr
+                GROUP By eatr.BuildingNumber, eatr.RoomNumber
+            )
+            SELECT
+                r.BuildingNumber,
+                r.RoomNumber,
+                r.RoomUseCode AS RoomType,
+                r.SquareFeet AS RoomSquareFeet,
+                o.occupant_count
+            FROM EmployeesAssignedToRooms eatr
+            JOIN Rooms r
+              ON r.BuildingNumber = eatr.BuildingNumber
+             AND r.RoomNumber = eatr.RoomNumber
+            JOIN occupants o
+              ON o.BuildingNumber = eatr.BuildingNumber
+             AND o.RoomNumber = eatr.RoomNumber
+            WHERE eatr.EmpID = %s
+            ORDER BY r.BuildingNumber, r.RoomNumber
+        """
+
+        cur.execute(rooms_query, (emp_id,))
+        rooms_row = cur.fetchall()
+
+        rooms_out = []
+        total_share = 0.0
+
+        for rr in rooms_row:
+            room_sqft = float(rr["RoomSquareFeet"]) if rr["RoomSquareFeet"] is not None else 0.0
+            occ = int(rr["occupant_count"]) if rr["occupant_count"] is not None else 1
+            share = compute_employee_share(room_sqft, occ)
+            total_share += share
+
+            rooms_out.append({
+                "BuildingNumber": rr["BuildingNumber"],
+                "RoomNumber": rr["RoomNumber"],
+                "RoomType": rr["RoomType"],
+                "RoomSquareFeet": room_sqft,
+                "EmployeeShareSquareFeet": share,
+            })
+        
+        return {
+            "FullName": emp["FullName"],
+            "DepartmentName": emp["DepartmentName"],
+            "Email": emp["Email"],
+            "TotalSpaceSquareFeet": total_share,
+            "Rooms": rooms_out,
+        }
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
+
+    
+
+# helper functions
+def compute_employee_share(room_sqft: float, occupant_count: int) -> float:
+    if occupant_count <= 1:
+        return float(room_sqft)
+    return float(room_sqft) / float(occupant_count)
+    
+
