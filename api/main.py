@@ -398,7 +398,7 @@ def getEmployees(college: str, department: str):
 
         if not employees:
 
-            raise HTTPException(status_code=404, detail="No employees found for that college/department")
+            return []
 
         emp_map = {}
         for e in employees:

@@ -17,6 +17,8 @@ class FakeCursor:
     def execute(self, query: str, params=None):
         self.last_query = query
         self.last_params = params
+        print("SQL:", query)
+        print("PARAMS:", params)
 
     def fetchone(self):
         q = self.last_query
@@ -53,6 +55,14 @@ class FakeCursor:
         # /getFloorplans
         if "FROM FloorPlans" in q and "JOIN Buildings" in q:
             return self.script.get("getFloorplans_rows", [])
+        
+        # /getEmployees employee list
+        if "FROM Employee e" in q and "JOIN Departments_Subdivisions" in q and "WHERE d.College" in q:
+            return self.script.get("Employees_rows", [])
+
+        # /getEmployees room shares
+        if "FROM Employees" in q and "SquareFeet" in q:
+            return self.script.get("EmployeeRoomShare_rows", [])
 
         return []
 
@@ -107,6 +117,18 @@ def script_ok():
             "BuildingName": "Clyde P. Fisher Science Hall",
             "BuildingNumber": "033-0",
             "FloorNumber": 3,
+        }],
+        "Employees_rows": [
+            {"EmpID": 1, "FullName": "Alice Example", "Email": "alice@calpoly.edu", "Position": "Professor", "Phone": "805-0101"},
+        ],
+        "EmployeeRoomShare_rows": [{
+        
+            "EmpID": 1,
+            "BuildingNumber": "033-0",
+            "RoomNumber": "100-00",
+            "SquareFeet": 300.0,
+            "occupant_count": 1,
+            "employee_share": 300.0,
         }],
     }
 
