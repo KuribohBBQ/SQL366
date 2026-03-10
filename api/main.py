@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
 
 from api.database import get_connection, test_connection
 from api.errors import ERR_NOT_FOUND, ERR_UNAUTHORIZED, SUCCESS
@@ -30,80 +29,54 @@ from api.lab4_api import (
     validatePermission,
 )
 
-app = FastAPI(title="CSC366 Lab 4 API Wrappers")
+app = FastAPI()
 
 
-class AddEmployeeBody(BaseModel):
-    full_name: str
-    email: str
-    dept_id: int
-    position: str | None = None
-    phone: str | None = None
+def _raise_from_error(exc: Exception):
+    if isinstance(exc, PermissionDeniedError):
+        raise HTTPException(status_code=403, detail="Permission denied") from exc
+    if isinstance(exc, NotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-class AssignRoomBody(BaseModel):
-    employee_identifier: Any
-    building_number: str
-    room_number: str
-
-
-class DepartmentAssignmentBody(BaseModel):
-    dept_identifier: Any
-    building_number: str
-    room_number: str
-
-
-class AssignEquipmentBody(BaseModel):
-    building_number: str
-    room_number: str
-    equipment_identifier: Any
-    new_count: int
-
-
-class AddEquipmentTypeBody(BaseModel):
-    equipment_type: str
-    is_sensitive: bool
-    description: str = ""
-
-
-def _map_error_to_http(err: Exception) -> HTTPException:
-    if isinstance(err, PermissionDeniedError):
-        return HTTPException(status_code=403, detail="Permission denied")
-    if isinstance(err, NotFoundError):
-        return HTTPException(status_code=404, detail=str(err))
-    return HTTPException(status_code=500, detail=str(err))
-
-
-def _map_code_to_http(code: str) -> tuple[int, str]:
+def _return_code_or_error(code: str):
     if code == SUCCESS:
-        return 200, code
+        return {"code": SUCCESS}
     if code == ERR_UNAUTHORIZED:
-        return 403, code
+        raise HTTPException(status_code=403, detail=code)
     if code == ERR_NOT_FOUND:
-        return 404, code
-    return 400, code
+        raise HTTPException(status_code=404, detail=code)
+    raise HTTPException(status_code=400, detail=code)
 
 
 @app.get("/")
-def root() -> dict[str, str]:
+def root():
     return {"status": "running"}
 
 
 @app.get("/db-check")
-def db_check() -> dict[str, str]:
+def db_check():
     return {"database_connection": "successful" if test_connection() else "failed"}
 
 
 @app.get("/validatePermission")
-def validate_permission_route(required_permission: int, userId: int, department: list[int] | None = Query(None), college: str | None = None):
+def validate_permission_route(
+    required_permission: int,
+    userId: int,
+    department: list[int] | None = Query(None),
+    college: str | None = None,
+):
     affiliation: dict[str, Any] = {}
     if department:
         affiliation["department"] = department
     if college:
         affiliation["college"] = college
+
     conn = get_connection()
     try:
-        return {"allowed": validatePermission(conn, required_permission, userId, affiliation)}
+        allowed = validatePermission(conn, required_permission, userId, affiliation)
+        return {"allowed": allowed}
     finally:
         conn.close()
 
@@ -114,7 +87,7 @@ def get_floorplans_route(userId: int):
     try:
         return getFloorplans(conn, userId)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -125,7 +98,7 @@ def get_rooms_route(userId: int, buildingNumber: str, floorNumber: int):
     try:
         return getRooms(conn, userId, buildingNumber, floorNumber)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -136,7 +109,7 @@ def find_room_route(userId: int, buildingNumber: str, floorNumber: int, x: int, 
     try:
         return findRoom(conn, userId, buildingNumber, floorNumber, x, y)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -147,7 +120,7 @@ def get_room_info_route(userId: int, buildingNumber: str, roomNumber: str):
     try:
         return getRoomInfo(conn, userId, buildingNumber, roomNumber)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -158,7 +131,7 @@ def get_dept_list_route(userId: int, collegeName: str):
     try:
         return getDeptList(conn, userId, collegeName)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -169,7 +142,7 @@ def get_employees_route(userId: int, collegeName: str, departmentName: str):
     try:
         return getEmployees(conn, userId, collegeName, departmentName)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -182,9 +155,8 @@ def get_employee_info_route(
     department: str | None = None,
     college: str | None = None,
 ):
-    identifier: Any
     if email:
-        identifier = {"email": email}
+        identifier: Any = {"email": email}
     elif name and department:
         identifier = {"name": name, "department": department, "college": college}
     elif name:
@@ -196,7 +168,7 @@ def get_employee_info_route(
     try:
         return getEmployeeInfo(conn, userId, identifier)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -207,7 +179,7 @@ def get_equipment_locations_route(userId: int, equipmentIdentifier: str):
     try:
         return getEquipmentLocations(conn, userId, equipmentIdentifier)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
@@ -218,87 +190,108 @@ def get_sensitive_equipment_locations_route(userId: int, collegeName: str):
     try:
         return getSensitiveEquipmentLocations(conn, userId, collegeName)
     except Exception as exc:
-        raise _map_error_to_http(exc) from exc
+        _raise_from_error(exc)
     finally:
         conn.close()
 
 
 @app.post("/addEmployee")
-def add_employee_route(userId: int, body: AddEmployeeBody):
+def add_employee_route(userId: int, body: dict[str, Any]):
     conn = get_connection()
     try:
-        code = addEmployee(conn, userId, body.full_name, body.email, body.dept_id, body.position, body.phone)
+        code = addEmployee(
+            conn,
+            userId,
+            body.get("full_name"),
+            body.get("email"),
+            body.get("dept_id"),
+            body.get("position"),
+            body.get("phone"),
+        )
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/assignRoom")
-def assign_room_route(userId: int, body: AssignRoomBody):
+def assign_room_route(userId: int, body: dict[str, Any]):
     conn = get_connection()
     try:
-        code = assignRoom(conn, userId, body.employee_identifier, body.building_number, body.room_number)
+        code = assignRoom(
+            conn,
+            userId,
+            body.get("employee_identifier"),
+            body.get("building_number"),
+            body.get("room_number"),
+        )
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/removeRoomAssignment")
-def remove_room_assignment_route(userId: int, body: AssignRoomBody):
+def remove_room_assignment_route(userId: int, body: dict[str, Any]):
     conn = get_connection()
     try:
-        code = removeRoomAssignment(conn, userId, body.employee_identifier, body.building_number, body.room_number)
+        code = removeRoomAssignment(
+            conn,
+            userId,
+            body.get("employee_identifier"),
+            body.get("building_number"),
+            body.get("room_number"),
+        )
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/departmentAssignment")
-def department_assignment_route(userId: int, body: DepartmentAssignmentBody):
+def department_assignment_route(userId: int, body: dict[str, Any]):
     conn = get_connection()
     try:
-        code = departmentAssignment(conn, userId, body.dept_identifier, body.building_number, body.room_number)
+        code = departmentAssignment(
+            conn,
+            userId,
+            body.get("dept_identifier"),
+            body.get("building_number"),
+            body.get("room_number"),
+        )
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/assignEquipment")
-def assign_equipment_route(userId: int, body: AssignEquipmentBody):
+def assign_equipment_route(userId: int, body: dict[str, Any]):
     conn = get_connection()
     try:
-        code = assignEquipment(conn, userId, body.building_number, body.room_number, body.equipment_identifier, body.new_count)
+        code = assignEquipment(
+            conn,
+            userId,
+            body.get("building_number"),
+            body.get("room_number"),
+            body.get("equipment_identifier"),
+            body.get("new_count"),
+        )
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/addEquipmentType")
-def add_equipment_type_route(userId: int, body: AddEquipmentTypeBody):
+def add_equipment_type_route(userId: int, body: dict[str, Any]):
     conn = get_connection()
     try:
-        code = addEquipmentType(conn, userId, body.equipment_type, body.is_sensitive, body.description)
+        code = addEquipmentType(
+            conn,
+            userId,
+            body.get("equipment_type"),
+            body.get("is_sensitive"),
+            body.get("description", ""),
+        )
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/logLogin")
@@ -308,10 +301,7 @@ def log_login_route(userId: int):
         code = logLogin(conn, userId)
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)
 
 
 @app.post("/logLogout")
@@ -321,7 +311,4 @@ def log_logout_route(userId: int):
         code = logLogout(conn, userId)
     finally:
         conn.close()
-    status, detail = _map_code_to_http(code)
-    if status != 200:
-        raise HTTPException(status_code=status, detail=detail)
-    return {"code": code}
+    return _return_code_or_error(code)

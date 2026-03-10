@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
-from pprint import pformat
-from typing import Any, Callable
 
 from api.database import get_connection_from_settings
 from api.errors import SUCCESS
@@ -18,41 +15,37 @@ from api.lab4_api import (
 )
 
 
-@dataclass
-class DemoContext:
-    god_user: int | None = None
-    college_update_user: int | None = None
-    dept_update_user: int | None = None
-    dept_view_user: int | None = None
-    sample_building: str | None = None
-    sample_room: str | None = None
+def print_call(name, args):
+    print("\n----------------------------------------")
+    print("Function:", name)
+    print("Args:", args)
 
 
-def _print_call(function_name: str, kwargs: dict[str, Any]) -> None:
-    print(f"\n=== CALL {function_name} ===")
-    print(f"args={pformat(kwargs)}")
-
-
-def _print_result(result: Any = None, error: Exception | None = None) -> None:
+def print_result(value=None, error=None):
     if error is None:
-        print(f"result={pformat(result)}")
+        print("Result:", value)
     else:
-        print(f"exception={type(error).__name__}: {error}")
+        print("Error:", type(error).__name__, "-", error)
 
 
-def run_call(function_name: str, fn: Callable[..., Any], **kwargs: Any) -> Any:
-    _print_call(function_name, kwargs)
+def run_call(name, fn, **kwargs):
+    print_call(name, kwargs)
     try:
-        result = fn(**kwargs)
-        _print_result(result=result)
-        return result
+        value = fn(**kwargs)
+        print_result(value=value)
+        return value
     except Exception as exc:
-        _print_result(error=exc)
+        print_result(error=exc)
         return None
 
 
-def discover_context(conn) -> DemoContext:
-    ctx = DemoContext()
+def discover_context(conn):
+    ctx = {
+        "god_user": None,
+        "dept_view_user": None,
+        "sample_building": None,
+        "sample_room": None,
+    }
     cur = conn.cursor(dictionary=True)
     try:
         cur.execute(
@@ -63,57 +56,47 @@ def discover_context(conn) -> DemoContext:
             ORDER BY u.UserID
             """
         )
-        users = cur.fetchall()
-        for row in users:
+        for row in cur.fetchall():
             role = row["RoleName"].lower()
-            if "god" in role and ctx.god_user is None:
-                ctx.god_user = row["UserID"]
-            if "college" in role and "update" in role and ctx.college_update_user is None:
-                ctx.college_update_user = row["UserID"]
-            if ("department" in role or "dept" in role) and "update" in role and ctx.dept_update_user is None:
-                ctx.dept_update_user = row["UserID"]
-            if ("department" in role or "dept" in role) and "view" in role and ctx.dept_view_user is None:
-                ctx.dept_view_user = row["UserID"]
+            if "god" in role and ctx["god_user"] is None:
+                ctx["god_user"] = row["UserID"]
+            if ("department" in role or "dept" in role) and "view" in role and ctx["dept_view_user"] is None:
+                ctx["dept_view_user"] = row["UserID"]
 
         cur.execute("SELECT BuildingNumber, RoomNumber FROM Rooms ORDER BY BuildingNumber, RoomNumber LIMIT 1")
         room = cur.fetchone()
         if room:
-            ctx.sample_building = room["BuildingNumber"]
-            ctx.sample_room = room["RoomNumber"]
+            ctx["sample_building"] = room["BuildingNumber"]
+            ctx["sample_room"] = room["RoomNumber"]
     finally:
         cur.close()
     return ctx
 
 
-def run_demo(settings_path: str = "settings.config") -> None:
+def run_demo(settings_path="settings.config"):
     conn = get_connection_from_settings(settings_path)
-    temp_equipment_name = f"LAB4_TMP_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    temp_name = "LAB4_TMP_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     try:
         ctx = discover_context(conn)
-        print("=== CSC 366 Lab 4 Harness ===")
-        print(pformat(ctx))
-
-        if ctx.god_user is None:
-            print("No God-level user found. Harness will still run what it can.")
-        if ctx.dept_view_user is None:
-            print("No Department View user found. Permission-failure demo may be limited.")
+        print("CSC 366 Lab 4 demo harness")
+        print("Context:", ctx)
 
         run_call(
             "validatePermission",
             validatePermission,
             conn=conn,
             required_permission=5,
-            user_id=ctx.god_user or 1,
+            user_id=ctx["god_user"] or 1,
             affiliation={},
         )
 
-        if ctx.dept_view_user is not None:
+        if ctx["dept_view_user"] is not None:
             run_call(
                 "validatePermission",
                 validatePermission,
                 conn=conn,
                 required_permission=2,
-                user_id=ctx.dept_view_user,
+                user_id=ctx["dept_view_user"],
                 affiliation={},
             )
 
@@ -121,64 +104,64 @@ def run_demo(settings_path: str = "settings.config") -> None:
             "getFloorplans",
             getFloorplans,
             conn=conn,
-            user_id=ctx.god_user or ctx.dept_view_user or 1,
+            user_id=ctx["god_user"] or ctx["dept_view_user"] or 1,
         )
 
-        if ctx.sample_building and ctx.sample_room:
+        if ctx["sample_building"] and ctx["sample_room"]:
             run_call(
                 "getRoomInfo",
                 getRoomInfo,
                 conn=conn,
-                user_id=ctx.god_user or ctx.dept_view_user or 1,
-                building_number=ctx.sample_building,
-                room_number=ctx.sample_room,
+                user_id=ctx["god_user"] or ctx["dept_view_user"] or 1,
+                building_number=ctx["sample_building"],
+                room_number=ctx["sample_room"],
             )
 
-        if ctx.dept_view_user is not None:
+        if ctx["dept_view_user"] is not None:
             run_call(
                 "addEquipmentType",
                 addEquipmentType,
                 conn=conn,
-                user_id=ctx.dept_view_user,
-                equipment_type=f"{temp_equipment_name}_DENY",
+                user_id=ctx["dept_view_user"],
+                equipment_type=temp_name + "_DENY",
                 is_sensitive=False,
-                description="Expected unauthorized test",
+                description="Should fail permission",
             )
 
         add_code = run_call(
             "addEquipmentType",
             addEquipmentType,
             conn=conn,
-            user_id=ctx.god_user or 1,
-            equipment_type=temp_equipment_name,
+            user_id=ctx["god_user"] or 1,
+            equipment_type=temp_name,
             is_sensitive=False,
-            description="Temporary harness equipment",
+            description="Temporary test row",
         )
 
-        if add_code == SUCCESS and ctx.sample_building and ctx.sample_room:
+        if add_code == SUCCESS and ctx["sample_building"] and ctx["sample_room"]:
             run_call(
                 "assignEquipment",
                 assignEquipment,
                 conn=conn,
-                user_id=ctx.god_user or 1,
-                building_number=ctx.sample_building,
-                room_number=ctx.sample_room,
-                equipment_identifier=temp_equipment_name,
+                user_id=ctx["god_user"] or 1,
+                building_number=ctx["sample_building"],
+                room_number=ctx["sample_room"],
+                equipment_identifier=temp_name,
                 new_count=1,
             )
             run_call(
                 "assignEquipment",
                 assignEquipment,
                 conn=conn,
-                user_id=ctx.god_user or 1,
-                building_number=ctx.sample_building,
-                room_number=ctx.sample_room,
-                equipment_identifier=temp_equipment_name,
+                user_id=ctx["god_user"] or 1,
+                building_number=ctx["sample_building"],
+                room_number=ctx["sample_room"],
+                equipment_identifier=temp_name,
                 new_count=0,
             )
 
-        run_call("logLogin", logLogin, conn=conn, user_id=ctx.god_user or 1)
-        run_call("logLogout", logLogout, conn=conn, user_id=ctx.god_user or 1)
+        run_call("logLogin", logLogin, conn=conn, user_id=ctx["god_user"] or 1)
+        run_call("logLogout", logLogout, conn=conn, user_id=ctx["god_user"] or 1)
     finally:
         conn.close()
 
