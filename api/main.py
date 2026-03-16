@@ -1402,3 +1402,24 @@ def logRoomDeptChange(userId: int, buildingNumber: str, roomNumber: str, fromDep
     finally:
         conn.close()
 
+@app.get("/getLatestLog", tags=["Part3"], summary="Get Latest Log Entry")
+def getLatestLog(userId: int):
+    conn = get_connection()
+    try:
+        if not validatePermission(3, userId, {}):
+            raise HTTPException(status_code=403, detail="Not allowed")
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT *
+            FROM Logs
+            ORDER BY ID DESC
+            LIMIT 1
+            """
+        )
+        log = cur.fetchone()
+        if not log:
+            raise HTTPException(status_code=404, detail="No logs found")
+        return log
+    finally:
+        conn.close()

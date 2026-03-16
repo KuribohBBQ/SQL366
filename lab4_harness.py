@@ -77,6 +77,7 @@ def find_sample_room():
         conn.close()
 
 
+
 def main():
     env = load_settings("settings.config")
     for key, val in env.items():
@@ -140,6 +141,7 @@ def main():
 
     run_http(client, "POST", "/logLogin", "logLogin", params={"userId": 1})
     run_http(client, "POST", "/logLogout", "logLogout", params={"userId": 1})
+    run_http(client, "GET", "/getLatestLog", "getLatestLog", params={"userId": 1})
 
 
 if __name__ == "__main__":
