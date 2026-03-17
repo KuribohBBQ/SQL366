@@ -195,10 +195,10 @@ def validatePermission(required_permission: int, userId: int, affiliation: Dict[
         if "department" in affiliation:
             dept_required = affiliation["department"]
             if isinstance(dept_required, list):
-                if user_dept not in dept_required:
+                if user_dept not in dept_required and user_perm != 2:
                     return False
             else:
-                if user_dept != dept_required:
+                if user_dept != dept_required and user_perm != 2:
                     return False
                 
         if "college" in affiliation:
@@ -1045,6 +1045,55 @@ def addEmployee(userId: int, payload: AddEmployeeInput):
             return _error_result(ERR_DUPLICATE, "Duplicate employee/email")
         if exc.errno in (1451, 1452):
             return _error_result(ERR_FK_VIOLATION, "Invalid DeptID")
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+    finally:
+        conn.close()
+
+@app.post("/removeEmployee", tags=["Part2"], summary="Remove Employee")
+def removeEmployee(userId: int, email: str):
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT EmpID, DeptID FROM Employees WHERE Email = %s LIMIT 1", (email,))
+        emp = cur.fetchone()
+
+        if not emp:
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+        affiliation = _dept_affiliation(conn, emp["DeptID"])
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+        
+        emp_id = emp["EmpID"]
+        cur2 = conn.cursor()
+
+        cur2.execute(
+            """
+            DELETE FROM EmployeesAssignedToRooms
+            WHERE EmpID = %s
+            """,
+            (emp_id,),
+        )
+
+        cur2.execute(
+            """
+            DELETE FROM Employees
+            WHERE EmpID = %s
+            """,
+            (emp_id,),
+        )
+        if cur2.rowcount == 0:
+            conn.rollback()
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+        cur2.close()
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Employee removed")
+    except mysql.connector.IntegrityError as exc:
+        conn.rollback()
+        if exc.errno in (1451, 1452):
+            return _error_result(ERR_FK_VIOLATION, "Employee is still referenced by other records")
         return _error_result(ERR_TYPE_MISMATCH, str(exc))
     except Exception as exc:
         conn.rollback()

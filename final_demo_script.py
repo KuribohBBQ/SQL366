@@ -138,6 +138,72 @@ def get_ceng_view_user() -> Dict[str, Any]:
     finally:
         conn.close()
 
+def get_bio_sci_update_user() -> Dict[str, Any]:
+    from api.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+                    SELECT u.UserId
+                    FROM Users u
+                    JOIN Employees e ON u.Email = e.Email
+                    WHERE u.Role_ID = 3 and e.DeptID = 115100
+                        LIMIT 1
+                    """
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No BCSM college update user found in database")
+        print(row)
+        return row
+    finally:
+        conn.close()
+
+def get_csc_update_user() -> Dict[str, Any]:
+    from api.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+                    SELECT u.UserId
+                    FROM Users u
+                    JOIN Employees e ON u.Email = e.Email
+                    WHERE u.Role_ID = 3 and e.DeptID = 111500
+                        LIMIT 1
+                    """
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No CENG college update user found in database")
+        print(row)
+        return row
+    finally:
+        conn.close()
+
+def get_bcsm_update_user() -> Dict[str, Any]:
+    from api.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+                    SELECT u.UserId
+                    FROM Users u
+                    JOIN Employees e ON u.Email = e.Email
+                    JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+                    WHERE u.Role_ID = 2 and d.College = 'BCSM'
+                        LIMIT 1
+                    """
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No BCSM college update user found in database")
+        print(row)
+        return row
+    finally:
+        conn.close()
 
 def print_employees(employee_list):
     if not employee_list:
@@ -222,7 +288,40 @@ def main():
     ceng_view_user = get_ceng_view_user()
     ceng_user_id = ceng_view_user["UserId"]
     run_http(client, "GET", "/getEmployeeInfo", "Get Employee Info CENG View", params={"name": "Mallary Greenlee-Wacker", "department": "Biological Sciences", "userId": ceng_user_id})
+
+    #EX: Equipment Search Admin View
+    run_http(client, "GET", "/getEquipmentLocations", "Get Equipment Locations Admin", params={"etype": "ULT Freezer", "userId": admin_id})
     
+    #EX: Get Enhanced Departments List
+    run_http(client, "GET", "/getDeptListEnhanced", "Get Enhanced Department List", params={"college": "BCSM", "userId": admin_id})
+
+    #EX: Add Biological Sciences Employee, College View
+    employee_name = "John Doe"
+    employee_email = "jdoe@example.com"
+    run_http(client, "POST", "/addEmployee", "Add Employee BCSM View", params={"userId": bcsm_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
+
+    #EX: Add Biological Sciences Employee, Wrong Department Update View
+    csc_update_user = get_csc_update_user()
+    csc_update_user_id = csc_update_user["UserId"]
+    run_http(client, "POST", "/addEmployee", "Add Employee CENG Update View (Wrong Dept)", params={"userId": csc_update_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
+
+    #EX: Add Biological Sciences Employee, Correct Department Update View
+    bio_sci_update_user = get_bio_sci_update_user()
+    bio_sci_update_user_id = bio_sci_update_user["UserId"]
+    run_http(client, "POST", "/addEmployee", "Add Employee BCSM Update View (Correct Dept)", params={"userId": bio_sci_update_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
+    #Remove the test employee after demo
+    run_http(client, "POST", "/removeEmployee", "Remove Test Employee BCSM Update View", params={"userId": bio_sci_update_user_id, "email": employee_email})
+
+    #EX: Add Biological Sciences Employee, BCSM College Update View
+    bcsm_update_user = get_bcsm_update_user()
+    bcsm_update_user_id = bcsm_update_user["UserId"]
+    run_http(client, "POST", "/addEmployee", "Add Employee BCSM College Update View", params={"userId": bcsm_update_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
+    #Remove the test employee after demo
+    run_http(client, "POST", "/removeEmployee", "Remove Test Employee BCSM College Update View", params={"userId": bcsm_update_user_id, "email": employee_email})
+
+    #EX: Add Biological Sciences Employee, Admin Update View
+    # run_http(client, "POST", "/addEmployee", "Add Employee Admin Update View", params={"userId": admin_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
+
 
 
 if __name__ == "__main__":
