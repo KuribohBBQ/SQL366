@@ -92,7 +92,24 @@ def get_admin_user() -> Dict[str, Any]:
     finally:
         conn.close()
 
+def print_employees(employee_list):
+    if not employee_list:
+        print("No employees found.")
+        return
 
+    for emp in employee_list:
+        print(f"\nName: {emp['FullName']}")
+        print(f"Email: {emp['Email']}")
+        print(f"Total Space: {emp['TotalSpaceSquareFeet']}")
+        print("Rooms:")
+        if not emp["Rooms"]:
+            print("  None")
+        else:
+            for room in emp["Rooms"]:
+                print(
+                    f"  {room['BuildingNumber']} {room['RoomNumber']} "
+                    f"(Share: {room['EmployeeShareSquareFeet']})"
+                )
 
 def main():
     env = load_settings("settings.config")
@@ -110,6 +127,41 @@ def main():
     admin = get_admin_user()
     admin_id = admin["UserId"]
     run_http(client, "GET", "/getDeptList", "Get Department List", params={"college": "BCSM", "userId": admin_id})
+
+    # EX: Get list of Floorplans
+    run_http(client, "GET", "/getFloorplans", "Get Floorplan List", params={"userId": admin_id})
+
+    # EX: Get list of Rooms
+    run_http(client, "GET", "/getRooms", "Get Room List", params={"buildingnumber": building, "floornumber": 3, "userId": admin_id})
+
+    #EX: Room Selection
+    run_http(client, "GET", "/findRoom", "Find Room", params={"buildingnumber": building, "floornumber": 3, "x": 220, "y": 80, "userId": admin_id})
+
+    #EX: Room Selection Overlapping
+    run_http(client, "GET", "/findRoom", "Find Room Overlapping", params={"buildingnumber": building, "floornumber": 3, "x": 220, "y": 91, "userId": admin_id})
+
+    #EX: Room Selection Out of Bounds
+    run_http(client, "GET", "/findRoom", "Find Room Out of Bounds", params={"buildingnumber": building, "floornumber": 3, "x": 500, "y": 500, "userId": admin_id})
+
+    #EX: Room Selection No Floorplan
+    run_http(client, "GET", "/findRoom", "Find Room No Floorplan", params={"buildingnumber": building, "floornumber": 1, "x": 220, "y": 80, "userId": admin_id})
+
+    #EX: Get List of Employees in a Department
+    resp = run_http(
+    client,
+    "GET",
+    "/getEmployees",
+    "Get Employees in Department",
+    params={
+        "college": "BCSM",
+        "department": "Biological Sciences",
+        "userId": admin_id
+    }
+    )
+    if resp and resp.status_code == 200:
+        print_employees(resp.json())
+
+    
 
 
 
