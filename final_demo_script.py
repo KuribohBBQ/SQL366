@@ -205,6 +205,29 @@ def get_bcsm_update_user() -> Dict[str, Any]:
     finally:
         conn.close()
 
+def get_ceng_update_user() -> Dict[str, Any]:
+    from api.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+                    SELECT u.UserId
+                    FROM Users u
+                    JOIN Employees e ON u.Email = e.Email
+                    JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+                    WHERE u.Role_ID = 2 and d.College = 'CENG'
+                        LIMIT 1
+                    """
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No CENG college update user found in database")
+        print(row)
+        return row
+    finally:
+        conn.close()
+
 def print_employees(employee_list):
     if not employee_list:
         print("No employees found.")
@@ -234,11 +257,11 @@ def main():
     client = TestClient(api_main.app)
 
     building, room = find_sample_room()
-    temp_name = "LAB4_TMP_" + datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # EX: Get list of Departments
     admin = get_admin_user()
     admin_id = admin["UserId"]
+
     run_http(client, "GET", "/getDeptList", "Get Department List", params={"college": "BCSM", "userId": admin_id})
 
     # EX: Get list of Floorplans
@@ -287,6 +310,8 @@ def main():
     #EX: Employee Search CENG View - Should not return results for BCSM employee
     ceng_view_user = get_ceng_view_user()
     ceng_user_id = ceng_view_user["UserId"]
+
+
     run_http(client, "GET", "/getEmployeeInfo", "Get Employee Info CENG View", params={"name": "Mallary Greenlee-Wacker", "department": "Biological Sciences", "userId": ceng_user_id})
 
     #EX: Equipment Search Admin View
@@ -303,11 +328,14 @@ def main():
     #EX: Add Biological Sciences Employee, Wrong Department Update View
     csc_update_user = get_csc_update_user()
     csc_update_user_id = csc_update_user["UserId"]
+
     run_http(client, "POST", "/addEmployee", "Add Employee CENG Update View (Wrong Dept)", params={"userId": csc_update_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
 
     #EX: Add Biological Sciences Employee, Correct Department Update View
     bio_sci_update_user = get_bio_sci_update_user()
     bio_sci_update_user_id = bio_sci_update_user["UserId"]
+
+
     run_http(client, "POST", "/addEmployee", "Add Employee BCSM Update View (Correct Dept)", params={"userId": bio_sci_update_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
     #Remove the test employee after demo
     run_http(client, "POST", "/removeEmployee", "Remove Test Employee BCSM Update View", params={"userId": bio_sci_update_user_id, "email": employee_email})
@@ -315,6 +343,7 @@ def main():
     #EX: Add Biological Sciences Employee, BCSM College Update View
     bcsm_update_user = get_bcsm_update_user()
     bcsm_update_user_id = bcsm_update_user["UserId"]
+
     run_http(client, "POST", "/addEmployee", "Add Employee BCSM College Update View", params={"userId": bcsm_update_user_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
     #Remove the test employee after demo
     run_http(client, "POST", "/removeEmployee", "Remove Test Employee BCSM College Update View", params={"userId": bcsm_update_user_id, "email": employee_email})
@@ -322,6 +351,132 @@ def main():
     #EX: Add Biological Sciences Employee, Admin Update View
     # run_http(client, "POST", "/addEmployee", "Add Employee Admin Update View", params={"userId": admin_id}, json_body={"FullName": employee_name, "Email": employee_email, "DeptID": 115100})
 
+    #EX: Assign Employee to Room, BCSM College Update View
+    run_http(client, "POST", "/assignRoom", "Assign Room BCSM College Update View", params={"userId": bcsm_update_user_id}, json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Room Assignment", params={"userId": admin_id})
+
+    # Remove Employee from Room after demo
+    run_http(client, "POST", "/removeRoomAssignment", "Remove Employee After Demo", params={"userId": bcsm_update_user_id}, json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Room Removal", params={"userId": admin_id})
+
+    #EX: Assign Employee to Room, Biological Sciences Update View
+    run_http(client, "POST", "/assignRoom", "Assign Room Biological Sciences Update View", params={"userId": bio_sci_update_user_id},  json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Room Assignment", params={"userId": admin_id})
+    # Remove Employee from Room after demo
+    run_http(client, "POST", "/removeRoomAssignment", "Remove Employee After Demo", params={"userId": bio_sci_update_user_id}, json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Room Removal", params={"userId": admin_id})
+
+    #EX: Assign Employee to Room, CENG Update View (Should not have permissions)
+    run_http(client, "POST", "/assignRoom", "Assign Room Computer Science Update View", params={"userId": csc_update_user_id},  json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+
+    #EX: Assign Employee to Room, Admin Update View
+    run_http(client, "POST", "/assignRoom", "Assign Room Admin View", params={"userId": admin_id}, json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Room Assignment", params={"userId": admin_id})
+    # Remove Employee from Room after demo
+    run_http(client, "POST", "/removeRoomAssignment", "Remove Employee After Demo", params={"userId": admin_id}, json_body={"EmployeeEmail": "nadam@calpoly.edu", "BuildingNumber": '033-0', "RoomNumber": '0355-C0'})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Room Removal", params={"userId": admin_id})
+
+
+    #EX: Reassign a Room to Another Department in BCSM, Admin View
+    run_http(client, "POST", "/departmentAssignment", "Reassign Room Department Admin View", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0355-C0', "DeptID": 115200})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Department Reassignment", params={"userId": admin_id})
+    #Change it back after demo
+    run_http(client, "POST", "/departmentAssignment", "Reassign Room Department Admin View", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0355-C0', "DeptID": 115100})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Department Reassignment", params={"userId": admin_id})
+
+    #EX: Reassign a Room to Another Department in BCSM, BCSM College Update View
+    run_http(client, "POST", "/departmentAssignment", "Reassign Room Department BCSM Update View", params={"userId": bcsm_update_user_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0355-C0', "DeptID": 115200})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Department Reassignment", params={"userId": admin_id})
+    #Change it back after demo
+    run_http(client, "POST", "/departmentAssignment", "Reassign Room Department BCSM Update View", params={"userId": bcsm_update_user_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0355-C0', "DeptID": 115100})
+    #Get latest log
+    run_http(client, "GET", "/getLatestLog", "Get Latest Log After Department Reassignment", params={"userId": admin_id})
+
+    #EX: Reassign a Room to Another Department in BCSM, CENG College Update View (Should not have permissions)
+    ceng_update_user = get_ceng_update_user()
+    ceng_update_user_id = ceng_update_user["UserId"]
+    run_http(client, "POST", "/departmentAssignment", "Reassign Room Department CENG Update View", params={"userId": ceng_update_user_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0355-C0', "DeptID": 115200})
+
+    #EX: Reassign a Room to Another Department in BCSM, BCSM College View (Should not have permissions)
+    run_http(client, "POST", "/departmentAssignment", "Reassign Room Department BCSM College View", params={"userId": bcsm_user_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0355-C0', "DeptID": 115200})
+
+    #EX: Add new Equipment Type, Admin View
+    resp = run_http(client, "POST", "/addEquipmentType", "Add Equipment Type Admin View", params={"userId": admin_id}, json_body={"EType": "Quantum Computer"})
+
+    #Confirm success, run query loooking up the new equipment type
+    if resp and resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+        from api.database import get_connection
+
+        conn = get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("""
+                SELECT EId, EType, EDescription, IsSensitive
+                FROM Equipment
+                WHERE EType = %s
+                LIMIT 1
+            """, ("Quantum Computer",))
+            row = cur.fetchone()
+
+            print("\n------------------------")
+            print("Function: Confirm Quantum Computer exists")
+            print("Args:", {"EType": "Quantum Computer"})
+            print("Result:", row)
+        finally:
+            conn.close()
+    
+    #Select 3 BCSM Rooms and add 1, 2, and 3 quantum computers to them, Admin View
+    sample_rooms = [
+        {"BuildingNumber": '033-0', "RoomNumber": '0251-00'},
+        {"BuildingNumber": '033-0', "RoomNumber": '0253-A0'},
+        {"BuildingNumber": '033-0', "RoomNumber": '0257-D0'},
+    ]
+    for i, room in enumerate(sample_rooms, start=1):
+        run_http(client, "POST", "/assignEquipment", f"Add {i} Quantum Computers to Room {room['BuildingNumber']} {room['RoomNumber']}", params={"userId": admin_id}, json_body={"BuildingNumber": room["BuildingNumber"], "RoomNumber": room["RoomNumber"], "EType": "Quantum Computer", "NewCount": i})
+        #Get latest log
+        run_http(client, "GET", "/getLatestLog", f"Get Latest Log After Adding Equipment to Room {room['BuildingNumber']} {room['RoomNumber']}", params={"userId": admin_id})
+    
+    #Remove all other equipments in the rooms for cleanliness after demo, Admin View (Prev Quantity = 1)
+    run_http(client, "POST", "/assignEquipment", "Remove Refrigerator and/or Freezer from Room 033-0 0251-00", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0251-00', "EType": "Refrigerator and/or Freezer", "NewCount": 0})
+
+    #Prev Quantity = 2
+    run_http(client, "POST", "/assignEquipment", "Remove Chest Freezer from Room 033-0 0253-A0", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0253-A0', "EType": "Chest Freezer", "NewCount": 0})
+
+    #Prev Quantity = 1
+    run_http(client, "POST", "/assignEquipment", "Remove Refrigerator and/or Freezer from Room 033-0 0257-D0", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0257-D0', "EType": "Refrigerator and/or Freezer", "NewCount": 0})
+
+    #Find Rooms with Quantum Computers, Admin View
+    run_http(client, "GET", "/getEquipmentLocations", "Find Rooms with Quantum Computers Admin View", params={"etype": "Quantum Computer", "userId": admin_id})
+
+    #DELETE the Quantum Computer Assignments After Demo, Admin View
+    for room in sample_rooms:
+        run_http(client, "POST", "/assignEquipment", f"Remove Quantum Computers from Room {room['BuildingNumber']} {room['RoomNumber']}", params={"userId": admin_id}, json_body={"BuildingNumber": room["BuildingNumber"], "RoomNumber": room["RoomNumber"], "EType": "Quantum Computer", "NewCount": 0})
+        #Get latest log
+        run_http(client, "GET", "/getLatestLog", f"Get Latest Log After Removing Quantum Computers from Room {room['BuildingNumber']} {room['RoomNumber']}", params={"userId": admin_id})
+    
+    #Add Original Equipment Back
+    run_http(client, "POST", "/assignEquipment", "Add Refrigerator and/or Freezer back to Room 033-0 0251-00", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0251-00', "EType": "Refrigerator and/or Freezer", "NewCount": 1})
+    run_http(client, "POST", "/assignEquipment", "Add Chest Freezer back to Room 033-0 0253-A0", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0253-A0', "EType": "Chest Freezer", "NewCount": 2})
+    run_http(client, "POST", "/assignEquipment", "Add Refrigerator and/or Freezer back to Room 033-0 0257-D0", params={"userId": admin_id}, json_body={"BuildingNumber": '033-0', "RoomNumber": '0257-D0', "EType": "Refrigerator and/or Freezer", "NewCount": 1})
+
+
+    #Duplicate Entries
+    #EX: Add duplicate Employee, Admin View
+    run_http(client, "POST", "/addEmployee", "Add Duplicate Employee Admin View", params={"userId": admin_id}, json_body={"FullName": "Sean Ryan", "Email": "srya@calpoly.edu", "DeptID": 115100})
+
+    #EX: Add duplicate Equipment Type, Admin View
+    run_http(client, "POST", "/addEquipmentType", "Add Duplicate Equipment Type Admin View", params={"userId": admin_id}, json_body={"EType": "Refrigerator and/or Freezer", "IsSensitive": True})
+
+    
 
 
 if __name__ == "__main__":
