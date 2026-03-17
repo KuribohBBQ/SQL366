@@ -92,6 +92,53 @@ def get_admin_user() -> Dict[str, Any]:
     finally:
         conn.close()
 
+def get_bcsm_view_user() -> Dict[str, Any]:
+    from api.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+                    SELECT u.UserId
+                    FROM Users u
+                    JOIN Employees e ON u.Email = e.Email
+                    JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+                    WHERE u.Role_ID = 4 and d.College = 'BCSM'
+                        LIMIT 1
+                    """
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No BCSM college view user found in database")
+        print(row)
+        return row
+    finally:
+        conn.close()
+
+def get_ceng_view_user() -> Dict[str, Any]:
+    from api.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+                    SELECT u.UserId
+                    FROM Users u
+                    JOIN Employees e ON u.Email = e.Email
+                    JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+                    WHERE u.Role_ID = 4 and d.College = 'CENG'
+                        LIMIT 1
+                    """
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No CENG college view user found in database")
+        print(row)
+        return row
+    finally:
+        conn.close()
+
+
 def print_employees(employee_list):
     if not employee_list:
         print("No employees found.")
@@ -162,7 +209,20 @@ def main():
         print_employees(resp.json())
 
     
+    #EX: Employee Search Admin View
+    run_http(client, "GET", "/getEmployeeInfo", "Get Employee Info Admin", params={"name": "Mallary Greenlee-Wacker", "department": "Biological Sciences", "userId": admin_id})
 
+    #EX: Employee Search BCSM View
+    bcsm_view_user = get_bcsm_view_user()
+    bcsm_user_id = bcsm_view_user["UserId"]
+
+    run_http(client, "GET", "/getEmployeeInfo", "Get Employee Info BCSM View", params={"name": "Mallary Greenlee-Wacker", "department": "Biological Sciences", "userId": bcsm_user_id})
+
+    #EX: Employee Search CENG View - Should not return results for BCSM employee
+    ceng_view_user = get_ceng_view_user()
+    ceng_user_id = ceng_view_user["UserId"]
+    run_http(client, "GET", "/getEmployeeInfo", "Get Employee Info CENG View", params={"name": "Mallary Greenlee-Wacker", "department": "Biological Sciences", "userId": ceng_user_id})
+    
 
 
 if __name__ == "__main__":

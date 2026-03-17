@@ -634,6 +634,7 @@ def getEmployees(college: str, department: str):
 
 @app.get("/getEmployeeInfo", tags=["Employees"], summary= "Get Employee Information", response_model=EmployeeInfoResponse, dependencies=[Depends(require_permission(5))])
 def getEmployeeInfo(
+    userId: int,
     email: Optional[str] = None,
     name: Optional[str] = None,
     department: Optional[str] = None,
@@ -671,7 +672,8 @@ def getEmployeeInfo(
                     e.EmpID,
                     e.FullName,
                     e.Email,
-                    d.DepartmentName
+                    d.DepartmentName,
+                    d.College
                 FROM Employees e
                 JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
                 WHERE e.FullName = %s
@@ -682,6 +684,13 @@ def getEmployeeInfo(
         emp = cur.fetchone()
         if not emp:
             raise HTTPException(status_code=404, detail="Employee not found")
+
+        affiliation = {
+            "college": emp["College"] if "College" in emp else None,
+        }
+
+        if not validatePermission(5, userId, affiliation):
+            raise HTTPException(status_code=403, detail="Permission denied")
         
         emp_id = emp["EmpID"]
 
