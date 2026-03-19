@@ -198,7 +198,7 @@ def demo_room_selection():
     print_result(resp)
 
     # d. Floor with no floorplan / no bounding boxes
-    action(f"Using Administrator account {admin['Name']}t to select a point on a floor with no floorplan or no room coordinates")
+    action(f"Using Administrator account {admin['Name']} to select a point on a floor with no floorplan or no room coordinates")
     resp = client.get(
         "/findRoom",
         params={
@@ -272,8 +272,181 @@ def demo_list_employees():
 
     print_employees_result(resp)
     return resp
-    
 
+# 6. employee info
+
+def print_employee_info(resp):
+    print("\nRESPONSE:")
+    print(f"  HTTP Status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+    except Exception:
+        print(f"  Raw Response: {resp.text}")
+        return
+
+    # Handle error response
+    if resp.status_code != 200:
+        print(f"  Error: {data}")
+        return
+
+    print("\n  Employee Information:")
+    print(f"    Name: {data.get('FullName', 'N/A')}")
+    print(f"    Email: {data.get('Email', 'N/A')}")
+    print(f"    Department: {data.get('DepartmentName', 'N/A')}")
+    print(f"    Total Space (sq ft): {data.get('TotalSpaceSquareFeet', 0)}")
+
+    rooms = data.get("Rooms", [])
+    print(f"    Rooms Assigned: {len(rooms)}")
+
+    if not rooms:
+        print("      None")
+    else:
+        for i, room in enumerate(rooms, 1):
+            print(f"      Room [{i}]")
+            print(f"        Building: {room.get('BuildingNumber', 'N/A')}")
+            print(f"        Room Number: {room.get('RoomNumber', 'N/A')}")
+            print(f"        Room Type: {room.get('RoomType', 'N/A')}")
+            print(f"        Room Sq Ft: {room.get('RoomSquareFeet', 0)}")
+            print(f"        Employee Share: {room.get('EmployeeShareSquareFeet', 0)}")
+    print()
+
+def print_employee_info(resp):
+    print("\nRESPONSE:")
+    print(f"  HTTP Status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+    except Exception:
+        print(f"  Raw Response: {resp.text}")
+        return
+
+    # Handle error response
+    if resp.status_code != 200:
+        print(f"  Error: {data}")
+        return
+
+    print("\n  Employee Information:")
+    print(f"    Name: {data.get('FullName', 'N/A')}")
+    print(f"    Email: {data.get('Email', 'N/A')}")
+    print(f"    Department: {data.get('DepartmentName', 'N/A')}")
+    print(f"    Total Space (sq ft): {data.get('TotalSpaceSquareFeet', 0)}")
+
+    rooms = data.get("Rooms", [])
+    print(f"    Rooms Assigned: {len(rooms)}")
+
+    if not rooms:
+        print("      None")
+    else:
+        for i, room in enumerate(rooms, 1):
+            print(f"      Room [{i}]")
+            print(f"        Building: {room.get('BuildingNumber', 'N/A')}")
+            print(f"        Room Number: {room.get('RoomNumber', 'N/A')}")
+            print(f"        Room Type: {room.get('RoomType', 'N/A')}")
+            print(f"        Room Sq Ft: {room.get('RoomSquareFeet', 0)}")
+            print(f"        Employee Share: {room.get('EmployeeShareSquareFeet', 0)}")
+    print()
+
+
+def get_bcsm_view_user():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 4 AND d.College = 'BCSM'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No BCSM view user found")
+        return row
+    finally:
+        conn.close()
+
+
+def get_other_college_view_user():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 4 AND d.College != 'BCSM'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No non-BCSM view user found")
+        return row
+    finally:
+        conn.close()
+
+
+def demo_employee_info():
+    section("6. Employee Info")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    bcsm_view_user = get_bcsm_view_user()
+    bcsm_view_user_id = bcsm_view_user["UserId"]
+
+    other_college_view_user = get_other_college_view_user()
+    other_college_view_user_id = other_college_view_user["UserId"]
+
+    employee_name = "Alan Kiste"
+    employee_department = "Chemistry & Biochemistry"
+
+    # a. Administrator access
+    action(
+        f"Using Administrator account {admin['Name']} to retrieve information for "
+        f"{employee_name} in {employee_department}"
+    )
+    resp = client.get(
+        "/getEmployeeInfo",
+        params={
+            "name": employee_name,
+            "department": employee_department,
+            "userId": admin_id
+        }
+    )
+    print_employee_info(resp)
+
+    # b. BCSM College View access
+    action(
+        f"Using BCSM College View account {bcsm_view_user['Name']} to retrieve information for "
+        f"{employee_name} in {employee_department}"
+    )
+    resp = client.get(
+        "/getEmployeeInfo",
+        params={
+            "name": employee_name,
+            "department": employee_department,
+            "userId": bcsm_view_user_id
+        }
+    )
+    print_employee_info(resp)
+
+    # c. Other college view access should fail
+    action(
+        f"Using non-BCSM College View account {other_college_view_user['Name']} to retrieve information for "
+        f"{employee_name} in {employee_department} (should fail)"
+    )
+    resp = client.get(
+        "/getEmployeeInfo",
+        params={
+            "name": employee_name,
+            "department": employee_department,
+            "userId": other_college_view_user_id
+        }
+    )
+    print_employee_info(resp)
 
 def main():
     # 1. List of Departments
@@ -292,7 +465,7 @@ def main():
     demo_list_employees()
 
     # 6. Employee Info
-    
+    demo_employee_info()
 
     # 7. Equipment Locations
 
