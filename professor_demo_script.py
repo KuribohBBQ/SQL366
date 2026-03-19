@@ -553,7 +553,258 @@ def demo_enhanced_department_list():
     print_enhanced_departments(resp)
     return resp
 
+# 9. addition of an employee using all roles
+def get_department_update_same_dept_user():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 3
+              AND d.DepartmentName = 'Chemistry & Biochemistry'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No Chemistry Department Update user found")
+        return row
+    finally:
+        conn.close()
 
+
+def get_department_update_other_dept_user():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name, d.DepartmentName
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 3
+              AND d.DepartmentName <> 'Chemistry & Biochemistry'
+              AND d.College = 'BCSM'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No different-department Department Update user found")
+        return row
+    finally:
+        conn.close()
+
+
+def get_bcsm_college_update_user():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 2
+              AND d.College = 'BCSM'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No BCSM College Update user found")
+        return row
+    finally:
+        conn.close()
+
+
+def get_other_college_update_user():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name, d.College
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 2
+              AND d.College <> 'BCSM'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No non-BCSM College Update user found")
+        return row
+    finally:
+        conn.close()
+
+
+def get_chemistry_dept_id():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT DeptID
+            FROM Departments_Subdivisions
+            WHERE DepartmentName = 'Chemistry & Biochemistry'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("Chemistry & Biochemistry department not found")
+        return row["DeptID"]
+    finally:
+        conn.close()
+
+def print_status_result(resp):
+    print("\nRESPONSE:")
+    print(f"  HTTP Status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+    except Exception:
+        print(f"  Raw Response: {resp.text}")
+        return
+
+    if isinstance(data, dict):
+        for k, v in data.items():
+            print(f"  {k}: {v}")
+    else:
+        print(f"  Data: {data}")
+
+def demo_latest_log(admin_id, description="Retrieve latest log record"):
+    action(description)
+    resp = client.get(
+        "/getLatestLog",
+        params={"userId": admin_id}
+    )
+    print_result(resp)
+    return resp
+
+
+def demo_add_employee():
+    section("9. Addition of an Employee")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    bcsm_view = get_bcsm_view_user()
+    same_dept_update = get_department_update_same_dept_user()
+    other_dept_update = get_department_update_other_dept_user()
+    bcsm_college_update = get_bcsm_college_update_user()
+    other_college_update = get_other_college_update_user()
+
+    chemistry_dept_id = get_chemistry_dept_id()
+
+    employee_name = "Professor Demo Chemistry Employee"
+    employee_email = "prof_demo_chem@calpoly.edu"
+
+    payload = {
+        "FullName": employee_name,
+        "Email": employee_email,
+        "DeptID": chemistry_dept_id
+    }
+
+    # a. BCSM College View - should fail
+    action(
+        f"Using BCSM College View account {bcsm_view['Name']} to add a Chemistry employee (should fail)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": bcsm_view["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    # b. Department Update from different department - should fail
+    action(
+        f"Using Department Update account {other_dept_update['Name']} from a different department to add a Chemistry employee (should fail)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": other_dept_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    # c. Department Update from same department - should succeed, then remove
+    action(
+        f"Using Department Update account {same_dept_update['Name']} from Chemistry & Biochemistry to add a Chemistry employee (should succeed)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": same_dept_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log record after successful same-department employee add")
+
+        action("Removing the test Chemistry employee after successful same-department add")
+        resp = client.post(
+            "/removeEmployee",
+            params={
+                "userId": same_dept_update["UserId"],
+                "email": employee_email
+            }
+        )
+        print_status_result(resp)
+
+        if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log record after successful same-department employee removal")
+
+    # d. BCSM College Update - should succeed, then remove
+    action(
+        f"Using BCSM College Update account {bcsm_college_update['Name']} to add a Chemistry employee (should succeed)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": bcsm_college_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log record after successful BCSM College Update employee add")
+
+        action("Removing the test Chemistry employee after successful BCSM College Update add")
+        resp = client.post(
+            "/removeEmployee",
+            params={
+                "userId": bcsm_college_update["UserId"],
+                "email": employee_email
+            }
+        )
+        print_status_result(resp)
+
+        if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log record after successful BCSM College Update employee removal")
+
+    # e. Other college update - should fail
+    action(
+        f"Using non-BCSM College Update account {other_college_update['Name']} to add a Chemistry employee (should fail)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": other_college_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    # f. Administrator - should succeed and remain for duplicate test later
+    action(
+        f"Using Administrator account {admin['Name']} to add a Chemistry employee (should succeed)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": admin_id},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log record after successful administrator employee add")
 
 
 def main():
@@ -582,8 +833,10 @@ def main():
     demo_enhanced_department_list()
 
     # 9. Addition of an Employee using all Roles
+    demo_add_employee()
 
     # 10. Room Assignment to a person
+    
 
     # 11. Department Room Assignment
 

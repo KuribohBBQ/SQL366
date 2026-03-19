@@ -1037,8 +1037,16 @@ def addEmployee(userId: int, payload: AddEmployeeInput):
             """,
             (payload.Email, payload.FullName, payload.DeptID),
         )
+
+        emp_id = cur.lastrowid
+
+        if _log_employee_change(conn, userId, emp_id, payload.DeptID, "Assign") != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
         conn.commit()
         return _error_result(SUCCESS_CODE, "Employee added")
+
     except mysql.connector.IntegrityError as exc:
         conn.rollback()
         if exc.errno == 1062:
@@ -1046,9 +1054,11 @@ def addEmployee(userId: int, payload: AddEmployeeInput):
         if exc.errno in (1451, 1452):
             return _error_result(ERR_FK_VIOLATION, "Invalid DeptID")
         return _error_result(ERR_TYPE_MISMATCH, str(exc))
+
     except Exception as exc:
         conn.rollback()
         return _error_result(ERR_TYPE_MISMATCH, str(exc))
+
     finally:
         conn.close()
 
@@ -1057,18 +1067,32 @@ def removeEmployee(userId: int, email: str):
     conn = get_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT EmpID, DeptID FROM Employees WHERE Email = %s LIMIT 1", (email,))
+        cur.execute(
+            """
+            SELECT EmpID, DeptID
+            FROM Employees
+            WHERE Email = %s
+            LIMIT 1
+            """,
+            (email,),
+        )
         emp = cur.fetchone()
 
         if not emp:
             return _error_result(ERR_NOT_FOUND, "Employee not found")
+
         affiliation = _dept_affiliation(conn, emp["DeptID"])
         if not validatePermission(3, userId, affiliation):
             return _error_result(ERR_UNAUTHORIZED, "Not allowed")
-        
-        emp_id = emp["EmpID"]
-        cur2 = conn.cursor()
 
+        emp_id = emp["EmpID"]
+        dept_id = emp["DeptID"]
+
+        if _log_employee_change(conn, userId, emp_id, dept_id, "Delete") != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
+        cur2 = conn.cursor()
         cur2.execute(
             """
             DELETE FROM EmployeesAssignedToRooms
@@ -1076,7 +1100,6 @@ def removeEmployee(userId: int, email: str):
             """,
             (emp_id,),
         )
-
         cur2.execute(
             """
             DELETE FROM Employees
@@ -1084,23 +1107,27 @@ def removeEmployee(userId: int, email: str):
             """,
             (emp_id,),
         )
+
         if cur2.rowcount == 0:
             conn.rollback()
             return _error_result(ERR_NOT_FOUND, "Employee not found")
+
         cur2.close()
         conn.commit()
         return _error_result(SUCCESS_CODE, "Employee removed")
+
     except mysql.connector.IntegrityError as exc:
         conn.rollback()
         if exc.errno in (1451, 1452):
             return _error_result(ERR_FK_VIOLATION, "Employee is still referenced by other records")
         return _error_result(ERR_TYPE_MISMATCH, str(exc))
+
     except Exception as exc:
         conn.rollback()
         return _error_result(ERR_TYPE_MISMATCH, str(exc))
+
     finally:
         conn.close()
-
 
 @app.post("/assignRoom", tags=["Part2"], summary="Assign Employee to Room")
 def assignRoom(userId: int, payload: RoomAssignmentInput):
@@ -1345,8 +1372,16 @@ def addEquipmentType(userId: int, payload: EquipmentTypeInput):
             """,
             (payload.EType, payload.EDescription, 1 if payload.IsSensitive else 0),
         )
+
+        eid = cur.lastrowid
+
+        if _log_equipment_type_change(conn, userId, eid, "Assign") != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
         conn.commit()
         return _error_result(SUCCESS_CODE, "Equipment type added")
+
     except mysql.connector.IntegrityError as exc:
         conn.rollback()
         if exc.errno == 1062:
@@ -1481,3 +1516,90 @@ def getLatestLog(userId: int):
         return log
     finally:
         conn.close()
+
+
+@app.post("/removeEmployee", tags=["Part2"], summary="Remove Employee")
+def removeEmployee(userId: int, email: str):
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT EmpID, DeptID
+            FROM Employees
+            WHERE Email = %s
+            LIMIT 1
+            """,
+            (email,),
+        )
+        emp = cur.fetchone()
+
+        if not emp:
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+
+        affiliation = _dept_affiliation(conn, emp["DeptID"])
+        if not validatePermission(3, userId, affiliation):
+            return _error_result(ERR_UNAUTHORIZED, "Not allowed")
+
+        emp_id = emp["EmpID"]
+        dept_id = emp["DeptID"]
+
+        if _log_employee_change(conn, userId, emp_id, dept_id, "Delete") != SUCCESS_CODE:
+            conn.rollback()
+            return _error_result(ERR_LOGGING_FAILURE, "Could not create log")
+
+        cur2 = conn.cursor()
+        cur2.execute(
+            """
+            DELETE FROM EmployeesAssignedToRooms
+            WHERE EmpID = %s
+            """,
+            (emp_id,),
+        )
+
+        cur2.execute(
+            """
+            DELETE FROM Employees
+            WHERE EmpID = %s
+            """,
+            (emp_id,),
+        )
+
+        if cur2.rowcount == 0:
+            conn.rollback()
+            return _error_result(ERR_NOT_FOUND, "Employee not found")
+
+        cur2.close()
+        conn.commit()
+        return _error_result(SUCCESS_CODE, "Employee removed")
+
+    except mysql.connector.IntegrityError as exc:
+        conn.rollback()
+        if exc.errno in (1451, 1452):
+            return _error_result(ERR_FK_VIOLATION, "Employee is still referenced by other records")
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+
+    except Exception as exc:
+        conn.rollback()
+        return _error_result(ERR_TYPE_MISMATCH, str(exc))
+
+    finally:
+        conn.close()
+
+
+def _log_employee_change(conn, user_id: int, emp_id: int, dept_id: int, action: str) -> str:
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO Logs (UserID, AssignOrDelete, EmpID, DeptID)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (user_id, action[:10], emp_id, dept_id),
+        )
+        return SUCCESS_CODE
+    except Exception as exc:
+        print("EMPLOYEE LOGGING ERROR:", exc)
+        return ERR_LOGGING_FAILURE
+    finally:
+        cur.close()
