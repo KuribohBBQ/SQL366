@@ -503,6 +503,56 @@ def demo_equipment_locations():
     print_equipment_locations(resp)
     return resp
 
+# 8. enhanced department list
+def print_enhanced_departments(resp):
+    print("\nRESPONSE:")
+    print(f"  HTTP Status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+    except Exception:
+        print(f"  Raw Response: {resp.text}")
+        return
+
+    if not isinstance(data, list):
+        print(f"  Data: {data}")
+        return
+
+    print(f"  Records Returned: {len(data)}\n")
+
+    if not data:
+        print("  No departments found.")
+        return
+
+    for i, dept in enumerate(data, 1):
+        print(f"  Department [{i}]")
+        print(f"    DeptID: {dept.get('DeptID', 'N/A')}")
+        print(f"    Department Name: {dept.get('DepartmentName', 'N/A')}")
+        print(f"    Number of Assigned Rooms: {dept.get('NumAssignedRooms', 0)}")
+        print(f"    Number of Rooms With Department Employees: {dept.get('NumRoomsWithDeptEmployees', 0)}")
+        print(f"    Assigned Rooms Square Feet: {dept.get('AssignedRoomsSquareFeet', 0)}")
+        print(f"    Employee Allocated Square Feet: {dept.get('EmployeeAllocatedSquareFeet', 0)}")
+        print()
+
+def demo_enhanced_department_list():
+    section("8. Enhanced Department List")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    action(f"Using Administrator account {admin['Name']} to retrieve the enhanced department list for BCSM")
+
+    resp = client.get(
+        "/getDeptListEnhanced",
+        params={
+            "college": "BCSM",
+            "userId": admin_id
+        }
+    )
+
+    print_enhanced_departments(resp)
+    return resp
+
 
 
 
@@ -529,7 +579,7 @@ def main():
     demo_equipment_locations()
     
     # 8. Enhanced Department List
-    
+    demo_enhanced_department_list()
 
     # 9. Addition of an Employee using all Roles
 
