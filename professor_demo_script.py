@@ -11,14 +11,14 @@ client = TestClient(api_main.app)
 
 # printing system
 def section(title):
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 140)
     print(f"SECTION: {title}")
-    print("=" * 80)
+    print("=" * 140)
 
 def action(description):
-    print("\n" + "-" * 80)
+    print("\n" + "-" * 140)
     print(f"ACTION: {description}")
-    print("-" * 80)
+    print("-" * 140)
 
 def params_block(params):
     print("PARAMETERS: ")
@@ -114,15 +114,35 @@ def demo_list_floorplans():
     admin_id = admin["UserId"]
     
     action(f"Using Administrator account {admin['Name']} to retrieve all floorplans")
-    resp = client.get{
+    resp = client.get(
         "/getFloorplans",
         params={
             "userId": admin_id
         }
-    }
+    )
 
     print_result(resp)
     return resp
+
+def demo_list_rooms():
+    section("3. List of Rooms")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    action(f"Using Administrator account {admin['Name']} to retrieve all rooms on floor 3 of Fisher and Science")
+    resp = client.get(
+        "/getRooms",
+        params={
+            "buildingnumber" : "033-0",
+            "floornumber" : 3,
+            "userId" : admin_id
+        }
+    )
+
+    print_result(resp)
+    return resp
+
 
 
 def main():
@@ -130,9 +150,10 @@ def main():
     demo_list_departments()
 
     # 2. List of Floorplans
-    demo_list_floorplans
+    demo_list_floorplans()
 
     # 3. List of Rooms
+    demo_list_rooms()
 
     # 4. Room Selection API
 
