@@ -448,6 +448,64 @@ def demo_employee_info():
     )
     print_employee_info(resp)
 
+# 7. equipment locations
+
+def print_equipment_locations(resp):
+    print("\nRESPONSE:")
+    print(f"  HTTP Status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+    except Exception:
+        print(f"  Raw Response: {resp.text}")
+        return
+
+    if resp.status_code != 200:
+        print(f"  Error: {data}")
+        return
+
+    print(f"\n  Equipment Type: {data.get('EType', 'N/A')}")
+
+    locations = data.get("Locations", [])
+    print(f"  Locations Found: {len(locations)}\n")
+
+    if not locations:
+        print("  No locations found.")
+        return
+
+    for i, loc in enumerate(locations, 1):
+        print(f"  Location [{i}]")
+        print(f"    Building: {loc.get('BuildingNumber', 'N/A')}")
+        print(f"    Room: {loc.get('RoomNumber', 'N/A')}")
+        print(f"    Quantity: {loc.get('Quantity', 0)}")
+        print()
+
+def demo_equipment_locations():
+    section("7. Equipment Locations")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    equipment_type = "ULT Freezer"
+
+    action(
+        f"Using Administrator account {admin['Name']} to retrieve locations of equipment type '{equipment_type}'"
+    )
+
+    resp = client.get(
+        "/getEquipmentLocations",
+        params={
+            "etype": equipment_type,
+            "userId": admin_id
+        }
+    )
+
+    print_equipment_locations(resp)
+    return resp
+
+
+
+
 def main():
     # 1. List of Departments
     demo_list_departments()
@@ -468,8 +526,10 @@ def main():
     demo_employee_info()
 
     # 7. Equipment Locations
-
+    demo_equipment_locations()
+    
     # 8. Enhanced Department List
+    
 
     # 9. Addition of an Employee using all Roles
 
