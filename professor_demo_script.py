@@ -107,6 +107,8 @@ def demo_list_departments():
 
     return resp
 
+# 2. list of floorplans
+
 def demo_list_floorplans():
     section("2. List of Floorplans")
 
@@ -123,6 +125,8 @@ def demo_list_floorplans():
 
     print_result(resp)
     return resp
+
+# 3. list of rooms
 
 def demo_list_rooms():
     section("3. List of Rooms")
@@ -143,6 +147,68 @@ def demo_list_rooms():
     print_result(resp)
     return resp
 
+def demo_room_selection():
+    section("4. Room Selection API")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    # a. Point inside a single room
+    action("Using Administrator account to select a point inside a single room")
+    resp = client.get(
+        "/findRoom",
+        params={
+            "buildingnumber": "033-0",
+            "floornumber": 3,
+            "x": 220,
+            "y": 80,
+            "userId": admin_id
+        }
+    )
+    print_result(resp)
+
+    # b. Point inside overlapping rooms
+    action("Using Administrator account to select a point inside overlapping rooms")
+    resp = client.get(
+        "/findRoom",
+        params={
+            "buildingnumber": "033-0",
+            "floornumber": 3,
+            "x": 220,
+            "y": 91,
+            "userId": admin_id
+        }
+    )
+    print_result(resp)
+
+    # c. Point outside all rooms
+    action("Using Administrator account to select a point outside all rooms")
+    resp = client.get(
+        "/findRoom",
+        params={
+            "buildingnumber": "033-0",
+            "floornumber": 3,
+            "x": 500,
+            "y": 500,
+            "userId": admin_id
+        }
+    )
+    print_result(resp)
+
+    # d. Floor with no floorplan / no bounding boxes
+    action("Using Administrator account to select a point on a floor with no floorplan or no room coordinates")
+    resp = client.get(
+        "/findRoom",
+        params={
+            "buildingnumber": "033-0",
+            "floornumber": 1,
+            "x": 220,
+            "y": 80,
+            "userId": admin_id
+        }
+    )
+    print_result(resp)
+    
 
 
 def main():
@@ -156,6 +222,7 @@ def main():
     demo_list_rooms()
 
     # 4. Room Selection API
+    demo_room_selection()
 
     # 5. List of Employees
 
