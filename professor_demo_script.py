@@ -107,6 +107,22 @@ def demo_list_departments():
 
     return resp
 
+def demo_list_floorplans():
+    section("2. List of Floorplans")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+    
+    action(f"Using Administrator account {admin['Name']} to retrieve all floorplans")
+    resp = client.get{
+        "/getFloorplans",
+        params={
+            "userId": admin_id
+        }
+    }
+
+    print_result(resp)
+    return resp
 
 
 def main():
@@ -114,6 +130,7 @@ def main():
     demo_list_departments()
 
     # 2. List of Floorplans
+    demo_list_floorplans
 
     # 3. List of Rooms
 
