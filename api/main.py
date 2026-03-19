@@ -178,7 +178,7 @@ def validatePermission(required_permission: int, userId: int, affiliation: Dict[
         """
         cur.execute(query, (userId,))
         user = cur.fetchone()
-        print("DEBUG user row:", user)
+        # print("DEBUG user row:", user)
         if not user:
             return False
         user_perm = user["RoleID"]
