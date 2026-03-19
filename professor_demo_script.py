@@ -554,48 +554,6 @@ def demo_enhanced_department_list():
     return resp
 
 # 9. addition of an employee using all roles
-def get_department_update_same_dept_user():
-    conn = get_connection()
-    try:
-        cur = conn.cursor(dictionary=True)
-        cur.execute("""
-            SELECT u.UserId, u.Name
-            FROM Users u
-            JOIN Employees e ON u.Email = e.Email
-            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
-            WHERE u.Role_ID = 3
-              AND d.DepartmentName = 'Chemistry & Biochemistry'
-            LIMIT 1
-        """)
-        row = cur.fetchone()
-        if not row:
-            raise ValueError("No Chemistry Department Update user found")
-        return row
-    finally:
-        conn.close()
-
-
-def get_department_update_other_dept_user():
-    conn = get_connection()
-    try:
-        cur = conn.cursor(dictionary=True)
-        cur.execute("""
-            SELECT u.UserId, u.Name, d.DepartmentName
-            FROM Users u
-            JOIN Employees e ON u.Email = e.Email
-            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
-            WHERE u.Role_ID = 3
-              AND d.DepartmentName <> 'Chemistry & Biochemistry'
-              AND d.College = 'BCSM'
-            LIMIT 1
-        """)
-        row = cur.fetchone()
-        if not row:
-            raise ValueError("No different-department Department Update user found")
-        return row
-    finally:
-        conn.close()
-
 
 def get_bcsm_college_update_user():
     conn = get_connection()
@@ -689,8 +647,10 @@ def demo_add_employee():
     admin_id = admin["UserId"]
 
     bcsm_view = get_bcsm_view_user()
-    same_dept_update = get_department_update_same_dept_user()
-    other_dept_update = get_department_update_other_dept_user()
+    target_department = "Chemistry & Biochemistry"
+
+    same_dept_update = get_department_update_user_for_department(target_department)
+    other_dept_update = get_other_bcsm_department_update_user(target_department)
     bcsm_college_update = get_bcsm_college_update_user()
     other_college_update = get_other_college_update_user()
 
@@ -806,8 +766,599 @@ def demo_add_employee():
     if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
         demo_latest_log(admin_id, "Retrieve latest log record after successful administrator employee add")
 
+# 10. room assignment to a person
+
+def get_department_update_user_for_department(department_name):
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name, d.DepartmentName
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 3
+              AND d.DepartmentName = %s
+            LIMIT 1
+        """, (department_name,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"No Department Update user found for {department_name}")
+        return row
+    finally:
+        conn.close()
+
+
+def get_other_bcsm_department_update_user(excluded_department):
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.UserId, u.Name, d.DepartmentName
+            FROM Users u
+            JOIN Employees e ON u.Email = e.Email
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE u.Role_ID = 3
+              AND d.College = 'BCSM'
+              AND d.DepartmentName <> %s
+            LIMIT 1
+        """, (excluded_department,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No different BCSM Department Update user found")
+        return row
+    finally:
+        conn.close()
+
+def get_sample_chemistry_employee_with_email():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT e.FullName, e.Email
+            FROM Employees e
+            JOIN Departments_Subdivisions d ON e.DeptID = d.DeptID
+            WHERE d.DepartmentName = 'Chemistry & Biochemistry'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No Chemistry employee found")
+        return row
+    finally:
+        conn.close()
+
+
+def get_random_non_chemistry_room():
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT ra.BuildingNumber, ra.RoomNumber, ra.DeptID
+            FROM RoomsAreAssignedToDepts_Subdiv ra
+            JOIN Departments_Subdivisions d ON ra.DeptID = d.DeptID
+            WHERE d.DepartmentName <> 'Chemistry & Biochemistry'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("No non-Chemistry room found")
+        return row
+    finally:
+        conn.close()
+
+
+def demo_room_assignment():
+    section("10. Room Assignment to Person")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    bcsm_update = get_bcsm_college_update_user()
+
+    target_department = "Chemistry & Biochemistry"
+    same_dept_update = get_department_update_user_for_department(target_department)
+    other_dept_update = get_other_bcsm_department_update_user(target_department)
+
+    chemistry_dept_id = get_chemistry_dept_id()
+
+    chem_employee = get_sample_chemistry_employee_with_email()
+    room_info = get_random_non_chemistry_room()
+
+    employee_email = chem_employee["Email"]
+    building = room_info["BuildingNumber"]
+    room = room_info["RoomNumber"]
+    original_dept_id = room_info["DeptID"]
+
+    # Step 0: temporarily assign room to Chemistry so same-dept permissions make sense
+    action(
+        f"Temporarily reassign room {building} {room} from department {original_dept_id} to Chemistry & Biochemistry for room-assignment demo"
+    )
+    resp = client.post(
+        "/departmentAssignment",
+        params={"userId": admin_id},
+        json={
+            "BuildingNumber": building,
+            "RoomNumber": room,
+            "DeptID": chemistry_dept_id
+        }
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after temporary room reassignment")
+
+    payload = {
+        "EmployeeEmail": employee_email,
+        "BuildingNumber": building,
+        "RoomNumber": room
+    }
+
+    # 1. BCSM College Update -> success
+    action(
+        f"Using BCSM College Update account {bcsm_update['Name']} to assign Chemistry employee {employee_email} to room {building} {room} (should succeed)"
+    )
+    resp = client.post(
+        "/assignRoom",
+        params={"userId": bcsm_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after room assignment")
+
+        action("Removing assignment after success")
+        resp = client.post(
+            "/removeRoomAssignment",
+            params={"userId": bcsm_update["UserId"]},
+            json=payload
+        )
+        print_status_result(resp)
+
+        if resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after room removal")
+
+    # 2. Department Update (same dept) -> success
+    action(
+        f"Using Department Update account {same_dept_update['Name']} from {same_dept_update['DepartmentName']} to assign Chemistry employee to room {building} {room} (should succeed)"
+    )
+    resp = client.post(
+        "/assignRoom",
+        params={"userId": same_dept_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after room assignment")
+
+        action("Removing assignment after success")
+        resp = client.post(
+            "/removeRoomAssignment",
+            params={"userId": same_dept_update["UserId"]},
+            json=payload
+        )
+        print_status_result(resp)
+
+        if resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after room removal")
+
+    # 3. Department Update (different dept) -> fail
+    action(
+        f"Using Department Update account {other_dept_update['Name']} from {other_dept_update['DepartmentName']} to assign Chemistry employee to room {building} {room} (should fail)"
+    )
+    resp = client.post(
+        "/assignRoom",
+        params={"userId": other_dept_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    # 4. Admin -> success
+    action(
+        f"Using Administrator account {admin['Name']} to assign Chemistry employee to room {building} {room} (should succeed)"
+    )
+    resp = client.post(
+        "/assignRoom",
+        params={"userId": admin_id},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after room assignment")
+
+        action("Removing assignment after success")
+        resp = client.post(
+            "/removeRoomAssignment",
+            params={"userId": admin_id},
+            json=payload
+        )
+        print_status_result(resp)
+
+        if resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after room removal")
+
+    # Final: revert room back to original department
+    action(
+        f"Reassign room {building} {room} back to its original department {original_dept_id}"
+    )
+    resp = client.post(
+        "/departmentAssignment",
+        params={"userId": admin_id},
+        json={
+            "BuildingNumber": building,
+            "RoomNumber": room,
+            "DeptID": original_dept_id
+        }
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after restoring original department assignment")
+
+
+# 11. department room assignment
+
+def demo_department_room_assignment():
+    section("11. Department Room Assignment")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    bcsm_update = get_bcsm_college_update_user()
+    bcsm_view = get_bcsm_view_user()
+    other_update = get_other_college_update_user()
+
+    chemistry_dept_id = get_chemistry_dept_id()
+
+    # original dept (for reverting after demo)
+    original_dept_id = 115100  # Biological Sciences
+
+    building = "033-0"
+    room = "0355-C0"
+
+    payload = {
+        "BuildingNumber": building,
+        "RoomNumber": room,
+        "DeptID": chemistry_dept_id
+    }
+
+    # 1. Admin → success
+    action(
+        f"Using Administrator account {admin['Name']} to assign room to Chemistry department (should succeed)"
+    )
+    resp = client.post(
+        "/departmentAssignment",
+        params={"userId": admin_id},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after department assignment")
+
+        # revert
+        action("Reverting room back to original department")
+        resp = client.post(
+            "/departmentAssignment",
+            params={"userId": admin_id},
+            json={
+                "BuildingNumber": building,
+                "RoomNumber": room,
+                "DeptID": original_dept_id
+            }
+        )
+        print_status_result(resp)
+
+        if resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after reverting department assignment")
+
+    # 2. BCSM College Update → success
+    action(
+        f"Using BCSM College Update account {bcsm_update['Name']} to assign room to Chemistry department (should succeed)"
+    )
+    resp = client.post(
+        "/departmentAssignment",
+        params={"userId": bcsm_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    if resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after department assignment")
+
+        # revert
+        action("Reverting room back to original department")
+        resp = client.post(
+            "/departmentAssignment",
+            params={"userId": bcsm_update["UserId"]},
+            json={
+                "BuildingNumber": building,
+                "RoomNumber": room,
+                "DeptID": original_dept_id
+            }
+        )
+        print_status_result(resp)
+
+        if resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after reverting department assignment")
+
+    # 3. Other college update → fail
+    action(
+        f"Using non-BCSM College Update account {other_update['Name']} to assign room to Chemistry (should fail)"
+    )
+    resp = client.post(
+        "/departmentAssignment",
+        params={"userId": other_update["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    # 4. BCSM College View → fail
+    action(
+        f"Using BCSM College View account {bcsm_view['Name']} to assign room to Chemistry (should fail)"
+    )
+    resp = client.post(
+        "/departmentAssignment",
+        params={"userId": bcsm_view["UserId"]},
+        json=payload
+    )
+    print_status_result(resp)
+
+    return {
+    "BuildingNumber": building,
+    "RoomNumber": room,
+    "OriginalDeptID": original_dept_id
+}
+
+
+    
+
+# 12. add new equipment type/assign equipment type to room 
+
+def demo_equipment_assignment():
+    section("12. Add New Equipment Type / Assign Equipment to Rooms")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    equipment_type = "Quantum Computer"
+
+    sample_rooms = [
+        {"BuildingNumber": "033-0", "RoomNumber": "0251-00", "NewCount": 1},
+        {"BuildingNumber": "033-0", "RoomNumber": "0253-A0", "NewCount": 2},
+        {"BuildingNumber": "033-0", "RoomNumber": "0257-D0", "NewCount": 3},
+    ]
+
+    # 1. Add equipment type
+    action(
+        f"Using Administrator account {admin['Name']} to add new equipment type '{equipment_type}'"
+    )
+    resp = client.post(
+        "/addEquipmentType",
+        params={"userId": admin_id},
+        json={
+            "EType": equipment_type,
+            "IsSensitive": False,
+            "EDescription": "Demo equipment type for professor script"
+        }
+    )
+    print_status_result(resp)
+
+    if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after adding equipment type")
+
+    # 2. Confirm equipment type exists
+    action(f"Confirm that equipment type '{equipment_type}' exists in the Equipment table")
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT EId, EType, EDescription, IsSensitive
+            FROM Equipment
+            WHERE EType = %s
+            LIMIT 1
+            """,
+            (equipment_type,)
+        )
+        row = cur.fetchone()
+        print("\nRESPONSE:")
+        if row:
+            for k, v in row.items():
+                print(f"  {k}: {v}")
+        else:
+            print("  No matching equipment type found.")
+    finally:
+        conn.close()
+
+    # 3. Assign 1, 2, and 3 Quantum Computers to three rooms
+    for room in sample_rooms:
+        action(
+            f"Assign {room['NewCount']} {equipment_type}(s) to room "
+            f"{room['BuildingNumber']} {room['RoomNumber']}"
+        )
+        resp = client.post(
+            "/assignEquipment",
+            params={"userId": admin_id},
+            json={
+                "BuildingNumber": room["BuildingNumber"],
+                "RoomNumber": room["RoomNumber"],
+                "EType": equipment_type,
+                "NewCount": room["NewCount"]
+            }
+        )
+        print_status_result(resp)
+
+        if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(
+                admin_id,
+                f"Retrieve latest log after assigning {equipment_type} to "
+                f"{room['BuildingNumber']} {room['RoomNumber']}"
+            )
+
+    # 4. Show all locations of the new equipment type
+    action(f"Retrieve all room locations for equipment type '{equipment_type}'")
+    resp = client.get(
+        "/getEquipmentLocations",
+        params={
+            "etype": equipment_type,
+            "userId": admin_id
+        }
+    )
+    print_equipment_locations(resp)
+
+# 13. duplicate entries
+def demo_duplicate_entries():
+    section("13. Duplicate Entries")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    # a. Duplicate employee
+    action(
+        f"Using Administrator account {admin['Name']} to add an employee who already exists (should fail)"
+    )
+    resp = client.post(
+        "/addEmployee",
+        params={"userId": admin_id},
+        json={
+            "FullName": "Professor Demo Chemistry Employee",
+            "Email": "prof_demo_chem@calpoly.edu",
+            "DeptID": get_chemistry_dept_id()
+        }
+    )
+    print_status_result(resp)
+
+    # b. Duplicate equipment type
+    action(
+        f"Using Administrator account {admin['Name']} to add an equipment type that already exists (should fail)"
+    )
+    resp = client.post(
+        "/addEquipmentType",
+        params={"userId": admin_id},
+        json={
+            "EType": "Quantum Computer",
+            "IsSensitive": False,
+            "EDescription": "Duplicate demo equipment type"
+        }
+    )
+    print_status_result(resp)
+
+def cleanup_demo_data(
+    demo_employee_email="prof_demo_chem@calpoly.edu",
+    temp_room_info=None
+):
+    section("Final Cleanup")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    # 1. Remove leftover demo employee
+    action(f"Remove leftover demo employee {demo_employee_email} if present")
+    resp = client.post(
+        "/removeEmployee",
+        params={
+            "userId": admin_id,
+            "email": demo_employee_email
+        }
+    )
+    print_status_result(resp)
+
+    if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+        demo_latest_log(admin_id, "Retrieve latest log after demo employee cleanup")
+
+    # 2. Remove leftover room assignment if present
+    if temp_room_info is not None:
+        building = temp_room_info["BuildingNumber"]
+        room = temp_room_info["RoomNumber"]
+
+        action(f"Remove leftover room assignment in {building} {room} if present")
+        resp = client.post(
+            "/removeRoomAssignment",
+            params={"userId": admin_id},
+            json={
+                "EmployeeEmail": "nadam@calpoly.edu",
+                "BuildingNumber": building,
+                "RoomNumber": room
+            }
+        )
+        print_status_result(resp)
+
+        if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after room assignment cleanup")
+
+        # 3. Restore room back to original department
+        action(f"Restore room {building} {room} to its original department")
+        resp = client.post(
+            "/departmentAssignment",
+            params={"userId": admin_id},
+            json={
+                "BuildingNumber": building,
+                "RoomNumber": room,
+                "DeptID": temp_room_info["OriginalDeptID"]
+            }
+        )
+        print_status_result(resp)
+
+        if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(admin_id, "Retrieve latest log after restoring original room department")
+
+    # 4. Remove Quantum Computer from demo rooms
+    quantum_rooms = [
+        {"BuildingNumber": "033-0", "RoomNumber": "0251-00"},
+        {"BuildingNumber": "033-0", "RoomNumber": "0253-A0"},
+        {"BuildingNumber": "033-0", "RoomNumber": "0257-D0"},
+    ]
+
+    for room in quantum_rooms:
+        action(
+            f"Remove Quantum Computer from room {room['BuildingNumber']} {room['RoomNumber']} if present"
+        )
+        resp = client.post(
+            "/assignEquipment",
+            params={"userId": admin_id},
+            json={
+                "BuildingNumber": room["BuildingNumber"],
+                "RoomNumber": room["RoomNumber"],
+                "EType": "Quantum Computer",
+                "NewCount": 0
+            }
+        )
+        print_status_result(resp)
+
+        if resp.status_code == 200 and resp.json().get("ErrorCode") == "SUCCESS":
+            demo_latest_log(
+                admin_id,
+                f"Retrieve latest log after removing Quantum Computer from {room['BuildingNumber']} {room['RoomNumber']}"
+            )
+
+    # 5. Delete Quantum Computer equipment type
+    action("Delete Quantum Computer equipment type")
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM Equipment
+            WHERE EType = 'Quantum Computer'
+        """)
+        conn.commit()
+
+        print("\nRESPONSE:")
+        print("  Equipment type 'Quantum Computer' deleted")
+    except Exception as exc:
+        conn.rollback()
+        print("\nRESPONSE:")
+        print(f"  Error deleting equipment type: {exc}")
+    finally:
+        conn.close()
+
+    action("Cleanup complete")
 
 def main():
+
     # 1. List of Departments
     demo_list_departments()
 
@@ -836,13 +1387,19 @@ def main():
     demo_add_employee()
 
     # 10. Room Assignment to a person
-    
+    demo_room_assignment()
 
     # 11. Department Room Assignment
+    demo_department_room_assignment()
 
     # 12. Add new equipment type / assign equipment to rooms
+    demo_equipment_assignment()
 
     # 13. Duplicate entries
+    demo_duplicate_entries()
+
+    cleanup_demo_data()
+
 
     return
 

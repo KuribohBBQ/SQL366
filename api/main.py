@@ -1603,3 +1603,21 @@ def _log_employee_change(conn, user_id: int, emp_id: int, dept_id: int, action: 
         return ERR_LOGGING_FAILURE
     finally:
         cur.close()
+        
+
+def _log_equipment_type_change(conn, user_id: int, eid: int, action: str) -> str:
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO Logs (UserID, AssignOrDelete, EId)
+            VALUES (%s, %s, %s)
+            """,
+            (user_id, action[:10], eid),
+        )
+        return SUCCESS_CODE
+    except Exception as exc:
+        print("EQUIPMENT TYPE LOG ERROR:", exc)
+        return ERR_LOGGING_FAILURE
+    finally:
+        cur.close()
