@@ -1,6 +1,5 @@
 # CSC 366 Lab 4
 
-
 ## where stuff is
 
 - api code: `api/main.py`
@@ -8,6 +7,9 @@
 - test/demo harness: `lab4_harness.py`
 - tests: `tests/`
 
+## github
+
+https://github.com/KuribohBBQ/SQL366
 
 ## make settings.config
 
