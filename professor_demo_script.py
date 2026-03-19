@@ -147,6 +147,8 @@ def demo_list_rooms():
     print_result(resp)
     return resp
 
+# 4. room selection api
+
 def demo_room_selection():
     section("4. Room Selection API")
 
@@ -154,7 +156,7 @@ def demo_room_selection():
     admin_id = admin["UserId"]
 
     # a. Point inside a single room
-    action("Using Administrator account to select a point inside a single room")
+    action(f"Using Administrator account {admin['Name']} to select a point inside a single room")
     resp = client.get(
         "/findRoom",
         params={
@@ -168,7 +170,7 @@ def demo_room_selection():
     print_result(resp)
 
     # b. Point inside overlapping rooms
-    action("Using Administrator account to select a point inside overlapping rooms")
+    action(f"Using Administrator account {admin['Name']} to select a point inside overlapping rooms")
     resp = client.get(
         "/findRoom",
         params={
@@ -182,7 +184,7 @@ def demo_room_selection():
     print_result(resp)
 
     # c. Point outside all rooms
-    action("Using Administrator account to select a point outside all rooms")
+    action(f"Using Administrator account {admin['Name']} to select a point outside all rooms")
     resp = client.get(
         "/findRoom",
         params={
@@ -196,7 +198,7 @@ def demo_room_selection():
     print_result(resp)
 
     # d. Floor with no floorplan / no bounding boxes
-    action("Using Administrator account to select a point on a floor with no floorplan or no room coordinates")
+    action(f"Using Administrator account {admin['Name']}t to select a point on a floor with no floorplan or no room coordinates")
     resp = client.get(
         "/findRoom",
         params={
@@ -208,6 +210,68 @@ def demo_room_selection():
         }
     )
     print_result(resp)
+    
+
+# 5. print employees
+
+def print_employees_result(resp):
+    print("\nRESPONSE:")
+    print(f"  HTTP Status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+    except Exception:
+        print(f"  Raw Response: {resp.text}")
+        return
+
+    if not isinstance(data, list):
+        print(f"  Data: {data}")
+        return
+
+    print(f"  Employees Returned: {len(data)}\n")
+
+    if not data:
+        print("  No employees found.")
+        return
+
+    for i, emp in enumerate(data, 1):
+        print(f"  Employee [{i}]")
+        print(f"    Name: {emp.get('FullName', 'N/A')}")
+        print(f"    Email: {emp.get('Email', 'N/A')}")
+        print(f"    Total Space (sq ft): {emp.get('TotalSpaceSquareFeet', 0)}")
+
+        rooms = emp.get("Rooms", [])
+        print(f"    Rooms Assigned: {len(rooms)}")
+
+        if not rooms:
+            print("      None")
+        else:
+            for j, room in enumerate(rooms, 1):
+                print(f"      Room [{j}]")
+                print(f"        Building: {room.get('BuildingNumber', 'N/A')}")
+                print(f"        Room Number: {room.get('RoomNumber', 'N/A')}")
+                print(f"        Employee Share (sq ft): {room.get('EmployeeShareSquareFeet', 0)}")
+        print()
+
+def demo_list_employees():
+    section("5. List of Employees")
+
+    admin = get_admin_user()
+    admin_id = admin["UserId"]
+
+    action(f"Using Administrator account {admin['Name']} to retrieve employees in Chemistry Department of BCSM")
+
+    resp = client.get(
+        "/getEmployees",
+        params={
+            "college": "BCSM",
+            "department": "Chemistry & Biochemistry",
+            "userId": admin_id
+        }
+    )
+
+    print_employees_result(resp)
+    return resp
     
 
 
@@ -225,8 +289,10 @@ def main():
     demo_room_selection()
 
     # 5. List of Employees
+    demo_list_employees()
 
     # 6. Employee Info
+    
 
     # 7. Equipment Locations
 
